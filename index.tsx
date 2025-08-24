@@ -45,7 +45,10 @@ const useLocalStorage = (key, initialValue) => {
     const [storedValue, setStoredValue] = useState(() => {
         try {
             const item = window.localStorage.getItem(key);
-            return item ? JSON.parse(item) : initialValue;
+            const value = item ? JSON.parse(item) : initialValue;
+            // If JSON.parse results in null, fall back to initialValue,
+            // which prevents errors with spreads on what should be objects/arrays.
+            return value === null ? initialValue : value;
         } catch (error) {
             console.error(error);
             return initialValue;
