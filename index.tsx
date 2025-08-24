@@ -1,6 +1,8 @@
 
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
+import { GoogleGenAI, Type } from "@google/genai";
 
 // --- CONFIGURATION ---
 const ADMIN_EMAIL = 'oladoyeheritage445@gmail.com';
@@ -45,10 +47,29 @@ const useLocalStorage = (key, initialValue) => {
     const [storedValue, setStoredValue] = useState(() => {
         try {
             const item = window.localStorage.getItem(key);
-            const value = item ? JSON.parse(item) : initialValue;
-            // If JSON.parse results in null, fall back to initialValue,
-            // which prevents errors with spreads on what should be objects/arrays.
-            return value === null ? initialValue : value;
+            // If there's no item in storage, return the initial value.
+            if (item === null) {
+                return initialValue;
+            }
+            
+            const value = JSON.parse(item);
+
+            // This is a safeguard against data corruption. If a stored value's type
+            // doesn't match what the application expects, we fall back to the initial value.
+            const isObjectLike = (v) => v !== null && typeof v === 'object';
+            
+            // Case 1: Initial value is an object, but the stored value isn't. Reset.
+            if (isObjectLike(initialValue) && !isObjectLike(value)) {
+                 return initialValue;
+            }
+            
+            // Case 2: Initial value is null (e.g., for a logged-out user), but the stored
+            // value is a primitive (not an object). This indicates corruption. Reset to null.
+            if (initialValue === null && value !== null && !isObjectLike(value)) {
+                return initialValue;
+            }
+            
+            return value;
         } catch (error) {
             console.error(error);
             return initialValue;
@@ -752,6 +773,86 @@ const CreateQuizPage = ({ setRoute, onCreateQuiz }) => {
     const [type, setType] = useState('mcq');
     const [questions, setQuestions] = useState([{ text: '', image: null, options: ['', '', '', ''], correctAnswerIndex: 0, modelAnswer: '' }]);
 
+    // AI Generator State
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [aiTopic, setAiTopic] = useState('');
+    const [aiNumQuestions, setAiNumQuestions] = useState(5);
+    const [aiError, setAiError] = useState('');
+
+    const handleGenerateQuestions = async () => {
+        if (!aiTopic.trim()) {
+            setAiError('Please enter a topic.');
+            return;
+        }
+         if (type !== 'mcq') {
+            setAiError('AI generation is only available for Multiple Choice quizzes for now.');
+            return;
+        }
+        setIsGenerating(true);
+        setAiError('');
+
+        try {
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            
+            const schema = {
+                type: Type.ARRAY,
+                items: {
+                    type: Type.OBJECT,
+                    properties: {
+                        questionText: {
+                            type: Type.STRING,
+                            description: "The text of the multiple-choice question."
+                        },
+                        options: {
+                            type: Type.ARRAY,
+                            items: { type: Type.STRING },
+                            description: "An array of 4 possible answers."
+                        },
+                        correctAnswerIndex: {
+                            type: Type.INTEGER,
+                            description: "The 0-based index of the correct answer in the options array."
+                        }
+                    },
+                    required: ["questionText", "options", "correctAnswerIndex"]
+                }
+            };
+
+            const prompt = `Generate ${aiNumQuestions} multiple-choice questions about "${aiTopic}". The questions should be suitable for university-level economics students. Ensure each question has exactly 4 options.`;
+
+            const response = await ai.models.generateContent({
+                model: "gemini-2.5-flash",
+                contents: prompt,
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: schema
+                }
+            });
+
+            const generatedData = JSON.parse(response.text);
+
+            if (Array.isArray(generatedData)) {
+                const newQuestions = generatedData.map(q => ({
+                    text: q.questionText || 'Missing question text',
+                    image: null,
+                    options: (Array.isArray(q.options) && q.options.length > 0)
+                        ? [...q.options.slice(0, 4), ...Array(Math.max(0, 4 - q.options.length)).fill('')]
+                        : ['', '', '', ''],
+                    correctAnswerIndex: (typeof q.correctAnswerIndex === 'number' && q.correctAnswerIndex >= 0 && q.correctAnswerIndex < 4) ? q.correctAnswerIndex : 0,
+                    modelAnswer: ''
+                }));
+                setQuestions(newQuestions);
+            } else {
+                throw new Error("AI response was not in the expected format (expected an array).");
+            }
+
+        } catch (error) {
+            console.error("Error generating questions:", error);
+            setAiError("Sorry, something went wrong while generating questions. Please try again or check the console for details.");
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
     const handleQuestionChange = (index, field, value) => {
         const newQuestions = [...questions];
         newQuestions[index][field] = value;
@@ -815,6 +916,26 @@ const CreateQuizPage = ({ setRoute, onCreateQuiz }) => {
                             <option value="theory">Theory</option>
                         </select>
                     </div>
+
+                    {type === 'mcq' && (
+                        <div className="card ai-generator-card">
+                            <h3>Generate Questions with AI</h3>
+                            <p className="page-subtitle" style={{textAlign: 'left', margin: '0 0 1.5rem 0', fontSize: '1rem', color: '#6B7280'}}>Save time by generating quiz questions automatically.</p>
+                            {aiError && <p className="error-message">{aiError}</p>}
+                            <div className="form-group">
+                                <label>Topic</label>
+                                <input type="text" value={aiTopic} onChange={e => setAiTopic(e.target.value)} placeholder="e.g., Principles of Microeconomics" />
+                            </div>
+                            <div className="form-group">
+                                <label>Number of Questions</label>
+                                <input type="number" value={aiNumQuestions} onChange={e => setAiNumQuestions(parseInt(e.target.value, 10))} min="1" max="10" />
+                            </div>
+                            <button type="button" className="btn-generate" onClick={handleGenerateQuestions} disabled={isGenerating}>
+                                {isGenerating ? 'Generating...' : 'Generate Questions'}
+                            </button>
+                        </div>
+                    )}
+                    
                     <hr/>
                     {questions.map((q, qIndex) => (
                         <div key={qIndex} className="question-editor">
