@@ -1540,7 +1540,7 @@ const App = () => {
     const [groups, setGroups] = useLocalStorage('app_groups', []);
 
     // --- Handlers ---
-    const handleSignUp = (formData) => {
+    const handleSignUp = (formData: Record<string, any>) => {
         const newUser = {
             id: Date.now(),
             ...formData,
@@ -1564,12 +1564,12 @@ const App = () => {
         setRoute({ page: 'home' }); 
     };
     
-    const handleProfileUpdate = (updatedData) => {
+    const handleProfileUpdate = (updatedData: object) => {
         setCurrentUser(prev => (prev ? { ...prev, ...updatedData } : prev));
         setUsers(prevUsers => prevUsers.map(u => (u && u.id === currentUser.id) ? {...u, ...updatedData} : u));
     };
     
-    const handleAddAnnouncement = (data) => {
+    const handleAddAnnouncement = (data: object) => {
         const newAnnouncement = {
             id: Date.now(),
             ...data,
@@ -1578,12 +1578,12 @@ const App = () => {
         setAnnouncements(prev => [newAnnouncement, ...prev]);
     };
     
-    const handleAddFaculty = (data) => {
+    const handleAddFaculty = (data: object) => {
         const newFaculty = { id: Date.now(), ...data };
         setFaculty(prev => [...prev, newFaculty]);
     };
 
-    const handleCourseUpdate = (level, semester, courseId, updatedData) => {
+    const handleCourseUpdate = (level, semester, courseId, updatedData: object) => {
         setCourses(prev => {
             const newCourses = { ...prev };
             const semesterCourses = newCourses[level][semester];
@@ -1609,7 +1609,7 @@ const App = () => {
         reader.readAsDataURL(file);
     };
 
-    const handleCreateQuiz = (quizData) => {
+    const handleCreateQuiz = (quizData: object) => {
         const newQuiz = { id: Date.now(), ...quizData };
         setQuizzes(prev => [newQuiz, ...prev]);
         setRoute({ page: 'quizzes' });
