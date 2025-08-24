@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { GoogleGenAI, Type } from "@google/genai";
@@ -1567,8 +1565,8 @@ const App = () => {
     };
     
     const handleProfileUpdate = (updatedData) => {
-        setCurrentUser(prev => ({...prev, ...updatedData}));
-        setUsers(prevUsers => prevUsers.map(u => u.id === currentUser.id ? {...u, ...updatedData} : u));
+        setCurrentUser(prev => (prev ? { ...prev, ...updatedData } : prev));
+        setUsers(prevUsers => prevUsers.map(u => (u && u.id === currentUser.id) ? {...u, ...updatedData} : u));
     };
     
     const handleAddAnnouncement = (data) => {
@@ -1698,11 +1696,11 @@ const App = () => {
     };
     
     const handleRoleChange = (userId, newRole) => {
-        setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+        setUsers(prev => prev.map(u => (u && u.id === userId) ? { ...u, role: newRole } : u));
     };
 
     const handleUserStatusChange = (userId, newStatus) => {
-         setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: newStatus } : u));
+         setUsers(prev => prev.map(u => (u && u.id === userId) ? { ...u, status: newStatus } : u));
     };
 
     const userNotifications = notifications.filter(n => n.userId === currentUser?.id).sort((a,b) => b.timestamp - a.timestamp);
