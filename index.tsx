@@ -1856,10 +1856,11 @@ const MessagesPage = ({ currentUser, users, messages, onSendMessage, route, setR
 
 interface TutoringMarketplacePageProps {
     currentUser: CurrentUser;
+    users: User[];
     tutorProfiles: TutorProfile[];
     onRegisterTutor: (profile: Omit<TutorProfile, 'userId'>) => void;
 }
-const TutoringMarketplacePage = ({ currentUser, tutorProfiles, onRegisterTutor }: TutoringMarketplacePageProps) => {
+const TutoringMarketplacePage = ({ currentUser, users, tutorProfiles, onRegisterTutor }: TutoringMarketplacePageProps) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const existingProfile = tutorProfiles.find(p => p.userId === currentUser.id);
     const [formData, setFormData] = useState({
@@ -1876,6 +1877,8 @@ const TutoringMarketplacePage = ({ currentUser, tutorProfiles, onRegisterTutor }
         });
         setIsModalOpen(false);
     };
+
+    const getUser = (userId: number) => users.find(u => u.id === userId);
 
     return (
         <div>
@@ -1902,15 +1905,19 @@ const TutoringMarketplacePage = ({ currentUser, tutorProfiles, onRegisterTutor }
             </Modal>
 
             <div className="directory-grid">
-                {tutorProfiles.map(profile => (
-                    <div className="card tutor-card" key={profile.userId}>
-                        <img src={currentUser.profilePicture || `https://api.dicebear.com/7.x/initials/svg?seed=${currentUser.fullName}`} alt={currentUser.fullName} />
-                        <h4>{currentUser.fullName}</h4>
-                        <p><strong>Subjects:</strong> {profile.subjects.join(', ')}</p>
-                        <p><strong>Rate:</strong> {profile.rate}</p>
-                        <p><strong>Availability:</strong> {profile.availability}</p>
-                    </div>
-                ))}
+                {tutorProfiles.map(profile => {
+                    const tutor = getUser(profile.userId);
+                    if (!tutor) return null;
+                    return (
+                        <div className="card tutor-card" key={profile.userId}>
+                            <img src={tutor.profilePicture || `https://api.dicebear.com/7.x/initials/svg?seed=${tutor.fullName}`} alt={tutor.fullName} />
+                            <h4>{tutor.fullName}</h4>
+                            <p><strong>Subjects:</strong> {profile.subjects.join(', ')}</p>
+                            <p><strong>Rate:</strong> {profile.rate}</p>
+                            <p><strong>Availability:</strong> {profile.availability}</p>
+                        </div>
+                    );
+                })}
             </div>
              {tutorProfiles.length === 0 && <div className="empty-state"><p>No tutors have registered yet. Be the first!</p></div>}
         </div>
@@ -2434,6 +2441,7 @@ const AdminPanelPage = (props: AdminPanelPageProps) => {
     const [editingItem, setEditingItem] = useState<any>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalType, setModalType] = useState('');
+    const restoreInputRef = useRef<HTMLInputElement>(null);
 
 
     const filteredUsers = users.filter(u => u.fullName.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -2686,8 +2694,6 @@ const AdminPanelPage = (props: AdminPanelPageProps) => {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         };
-    
-        const restoreInputRef = useRef<HTMLInputElement>(null);
     
         const handleRestoreClick = () => {
             restoreInputRef.current?.click();
@@ -3258,7 +3264,7 @@ const App = () => {
             case 'calendar': return <CalendarPage events={calendarEvents} currentUser={currentUser} onAddEvent={handleAddCalendarEvent} />;
             case 'members': return <MembersPage users={users} setRoute={setRoute} />;
             case 'messages': return <MessagesPage currentUser={currentUser} users={users} messages={messages} onSendMessage={handleSendMessage} route={route} setRoute={setRoute} />;
-            case 'tutoring': return <TutoringMarketplacePage currentUser={currentUser} tutorProfiles={tutorProfiles} onRegisterTutor={handleRegisterTutor} />;
+            case 'tutoring': return <TutoringMarketplacePage currentUser={currentUser} users={users} tutorProfiles={tutorProfiles} onRegisterTutor={handleRegisterTutor} />;
             case 'jobs': return <JobBoardPage jobs={jobs} currentUser={currentUser} onAddJob={handleAddJob} />;
             case 'lostAndFound': return <LostAndFoundPage items={lostFoundItems} currentUser={currentUser} onAddItem={handleAddLostFoundItem} users={users} />;
             case 'publicNotes': return <PublicNotesPage currentUser={currentUser} publicNotes={publicNotes} onAddPublicNote={handleAddPublicNote} users={users} />;
