@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
+import { Analytics } from "@vercel/analytics/react";
 
 // --- BASE TYPE DEFINITIONS ---
 interface SignUpFormData {
@@ -608,8 +609,9 @@ const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
 interface HomePageProps {
     currentUser: CurrentUser;
     announcements: Announcement[];
+    setRoute: (route: Route) => void;
 }
-const HomePage = ({ currentUser, announcements }: HomePageProps) => (
+const HomePage = ({ currentUser, announcements, setRoute }: HomePageProps) => (
     <div>
         <div className="hero">
             <h1 className="welcome-message">Welcome, {currentUser.firstName}</h1>
@@ -636,9 +638,9 @@ const HomePage = ({ currentUser, announcements }: HomePageProps) => (
                  <div className="card">
                     <h3>Quick Links</h3>
                      <nav className="sidebar-nav">
-                        <a href="#">My Courses</a>
-                        <a href="#">My Grades</a>
-                        <a href="#">University Calendar</a>
+                        <a href="#" onClick={(e) => { e.preventDefault(); setRoute({ page: 'courses' }); }}>My Courses</a>
+                        <a href="#" onClick={(e) => { e.preventDefault(); setRoute({ page: 'gradebook' }); }}>My Grades</a>
+                        <a href="#" onClick={(e) => { e.preventDefault(); setRoute({ page: 'calendar' }); }}>University Calendar</a>
                     </nav>
                  </div>
             </aside>
@@ -2988,11 +2990,23 @@ const App = () => {
     };
     
     const handleAddAssignment = (data: Omit<Assignment, 'id'>) => {
-        setAssignments(prev => [{ ...data, id: Date.now() }, ...prev]);
+        const newAssignment = { ...data, id: Date.now() };
+        setAssignments(prev => [newAssignment, ...prev]);
+        users.forEach(u => {
+            if (u.id !== currentUser?.id) {
+                createNotification(u.id, `New Assignment: ${newAssignment.title} for ${newAssignment.courseCode}`, { page: 'assignments' });
+            }
+        });
     };
     
     const handleAddResource = (data: Omit<Resource, 'id'>) => {
-        setResources(prev => [{ ...data, id: Date.now() }, ...prev]);
+        const newResource = { ...data, id: Date.now() };
+        setResources(prev => [newResource, ...prev]);
+        users.forEach(u => {
+            if (u.id !== currentUser?.id) {
+                createNotification(u.id, `New Resource: ${newResource.title} for ${newResource.courseCode}`, { page: 'resourceLibrary' });
+            }
+        });
     };
 
     const handleAddCustomGrade = (grade: Omit<CustomGrade, 'id' | 'userId'>) => {
@@ -3020,16 +3034,38 @@ const App = () => {
             posts: [{ id: Date.now() + 1, authorId: currentUser.id, content: data.content, timestamp: Date.now() }]
         };
         setForumThreads(prev => [newThread, ...prev]);
+        users.forEach(u => {
+            if (u.id !== currentUser.id) {
+                createNotification(u.id, `New Forum Thread: "${newThread.title}"`, { page: 'viewForumThread', threadId: newThread.id });
+            }
+        });
     };
     
     const handleAddForumPost = (threadId: number, content: string) => {
         if (!currentUser) return;
         const newPost: ForumPost = { id: Date.now(), authorId: currentUser.id, content, timestamp: Date.now() };
+        
+        const thread = forumThreads.find(t => t.id === threadId);
+        if (thread) {
+            const participants = [...new Set(thread.posts.map(p => p.authorId))];
+            participants.forEach(userId => {
+                if (userId !== currentUser.id) {
+                    createNotification(userId, `${currentUser.username} replied to "${thread.title}"`, { page: 'viewForumThread', threadId: thread.id });
+                }
+            });
+        }
+        
         setForumThreads(prev => prev.map(t => t.id === threadId ? { ...t, posts: [...t.posts, newPost] } : t));
     };
     
     const handleAddCalendarEvent = (event: Omit<CalendarEvent, 'id'>) => {
-        setCalendarEvents(prev => [...prev, { ...event, id: Date.now() }]);
+        const newEvent = { ...event, id: Date.now() };
+        setCalendarEvents(prev => [...prev, newEvent]);
+        users.forEach(u => {
+            if (u.id !== currentUser?.id) {
+                createNotification(u.id, `New Calendar Event: ${newEvent.title} on ${newEvent.date}`, { page: 'calendar' });
+            }
+        });
     };
 
     const handleAddFlashcardSet = (set: { title: string, courseCode: string, cards: Omit<Flashcard, 'id'>[] }) => {
@@ -3040,12 +3076,24 @@ const App = () => {
     
     const handleAddJob = (job: Omit<Job, 'id' | 'postedById'>) => {
         if (!currentUser) return;
-        setJobs(prev => [{ ...job, id: Date.now(), postedById: currentUser.id }, ...prev]);
+        const newJob = { ...job, id: Date.now(), postedById: currentUser.id };
+        setJobs(prev => [newJob, ...prev]);
+        users.forEach(u => {
+            if (u.id !== currentUser.id) {
+                createNotification(u.id, `New Job Posting: ${newJob.title} at ${newJob.company}`, { page: 'jobs' });
+            }
+        });
     };
 
     const handleAddLostFoundItem = (item: Omit<LostFoundItem, 'id' | 'postedById' | 'timestamp'>) => {
         if (!currentUser) return;
-        setLostFoundItems(prev => [{ ...item, id: Date.now(), postedById: currentUser.id, timestamp: Date.now() }, ...prev]);
+        const newItem = { ...item, id: Date.now(), postedById: currentUser.id, timestamp: Date.now() };
+        setLostFoundItems(prev => [newItem, ...prev]);
+        users.forEach(u => {
+            if (u.id !== currentUser.id) {
+                createNotification(u.id, `New ${newItem.type} item: ${newItem.itemName}`, { page: 'lostAndFound' });
+            }
+        });
     };
     
     // --- NEW HANDLER FUNCTIONS ---
@@ -3054,6 +3102,11 @@ const App = () => {
         if (!currentUser) return;
         const newQuiz = { ...quizData, id: Date.now(), creatorId: currentUser.id };
         setQuizzes(prev => [newQuiz, ...prev]);
+         users.forEach(u => {
+            if (u.id !== currentUser?.id) {
+                createNotification(u.id, `New Quiz: "${newQuiz.title}" is available.`, { page: 'quizzes' });
+            }
+        });
     };
     
     const handleQuizSubmission = (submissionData: Omit<QuizSubmission, 'id' | 'timestamp'>) => {
@@ -3066,6 +3119,11 @@ const App = () => {
         if (!currentUser) return;
         const newPoll = { ...pollData, id: Date.now(), createdBy: currentUser.id };
         setPolls(prev => [newPoll, ...prev]);
+        users.forEach(u => {
+            if (u.id !== currentUser.id) {
+                createNotification(u.id, `New Poll: "${newPoll.question}"`, { page: 'polls' });
+            }
+        });
     };
     
     const handleVote = (pollId: number, optionIndex: number) => {
@@ -3099,6 +3157,11 @@ const App = () => {
         if (!currentUser) return;
         const newNote = { ...noteData, id: Date.now(), authorId: currentUser.id };
         setPublicNotes(prev => [newNote, ...prev]);
+        users.forEach(u => {
+            if (u.id !== currentUser.id) {
+                createNotification(u.id, `New Public Note: "${newNote.title}" was added.`, { page: 'publicNotes' });
+            }
+        });
     };
 
     const handleSendMessage = (toId: number, text: string) => {
@@ -3112,6 +3175,7 @@ const App = () => {
             read: false
         };
         setMessages(prev => [...prev, newMessage]);
+        createNotification(toId, `New message from ${currentUser.username}`, { page: 'messages', with: currentUser.id });
     };
     
     // --- ADMIN HANDLERS ---
@@ -3224,7 +3288,7 @@ const App = () => {
 
     const renderPage = () => {
         switch (route.page) {
-            case 'home': return <HomePage currentUser={currentUser} announcements={announcements} />;
+            case 'home': return <HomePage currentUser={currentUser} announcements={announcements} setRoute={setRoute} />;
             case 'announcements': return <AnnouncementsPage announcements={announcements} currentUser={currentUser} onAddAnnouncement={handleAddAnnouncement} />;
             case 'courses': return <CoursesPage coursesData={coursesData} />;
             case 'coursePlanner': return <CoursePlannerPage currentUser={currentUser} coursePlans={coursePlans} onUpdateCoursePlan={handleUpdateCoursePlan} coursesData={coursesData} />;
@@ -3289,6 +3353,7 @@ const App = () => {
 
     return (
         <div className="app-layout">
+            <Analytics />
             <Sidebar route={route} setRoute={setRoute} isSidebarOpen={isSidebarOpen} />
             {isSidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)}></div>}
             <div className="main-content-wrapper">
