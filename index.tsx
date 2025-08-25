@@ -1,72 +1,315 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
-import { GoogleGenAI, Type } from "@google/genai";
 
-// --- CONFIGURATION ---
+// --- BASE TYPE DEFINITIONS ---
+interface SignUpFormData {
+    firstName: string;
+    otherName: string;
+    surname: string;
+    username: string;
+    email: string;
+    matricNumber: string;
+    password: string;
+}
+interface User extends SignUpFormData {
+    id: number;
+    fullName: string;
+    role: string;
+    status: string;
+    profilePicture: string | null;
+}
+type CurrentUser = Omit<User, 'password'>;
+interface Announcement {
+    id: number;
+    title: string;
+    date: string;
+    content: string;
+}
+interface Course {
+    id: number;
+    code: string;
+    title: string;
+    units: string;
+}
+type CoursesData = Record<string, Record<string, Course[]>>;
+interface Document {
+    id: number;
+    name: string;
+    type: string;
+    data: string; // base64
+}
+interface Message {
+    id: number;
+    from: number;
+    to: number;
+    text: string;
+    timestamp: number;
+    read: boolean;
+}
+interface Notification {
+    id: number;
+    userId: number;
+    text: string;
+    read: boolean;
+    timestamp: number;
+    link?: { page: string; [key: string]: any };
+}
+type Route = {
+    page: string;
+    [key: string]: any;
+};
+
+// --- NEW FEATURE TYPE DEFINITIONS ---
+interface GpaEntry {
+    id: number;
+    userId: number;
+    courseCode: string;
+    grade: 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
+    units: number;
+    semester: string;
+}
+interface Faculty {
+    id: number;
+    name: string;
+    title: string;
+    email: string;
+    office: string;
+    courses: string[];
+    profilePicture: string;
+}
+interface Assignment {
+    id: number;
+    title: string;
+    description: string;
+    dueDate: string;
+    courseCode: string;
+}
+interface Resource extends Document {
+    courseCode: string;
+    uploaderId: number;
+    title: string;
+}
+interface QuizQuestion {
+    text: string;
+    options: string[];
+    correctAnswerIndex: number;
+}
+interface Quiz {
+    id: number;
+    title: string;
+    courseCode: string;
+    questions: QuizQuestion[];
+    creatorId: number;
+}
+interface QuizSubmission {
+    id: number;
+    quizId: number;
+    userId: number;
+    answers: (number | null)[];
+    score: number;
+    timestamp: number;
+}
+interface CustomGrade {
+    id: number;
+    userId: number;
+    itemName: string;
+    score: number;
+    total: number;
+    courseCode: string;
+}
+interface ForumPost {
+    id: number;
+    authorId: number;
+    content: string;
+    timestamp: number;
+}
+interface ForumThread {
+    id: number;
+    title: string;
+    authorId: number;
+    timestamp: number;
+    posts: ForumPost[];
+}
+interface Poll {
+    id: number;
+    question: string;
+    options: { text: string; votes: number[] }[];
+    createdBy: number;
+}
+interface CalendarEvent {
+    id: number;
+    title: string;
+    date: string; // YYYY-MM-DD
+    type: 'academic' | 'social' | 'deadline';
+}
+interface CoursePlan {
+    userId: number;
+    semester: string; // e.g., "100 Level Harmattan"
+    courseCodes: string[];
+}
+interface TutorProfile {
+    userId: number;
+    rate: string;
+    availability: string;
+    subjects: string[]; // Course codes
+}
+interface Job {
+    id: number;
+    title: string;
+    company: string;
+    location: string;
+    type: 'Internship' | 'Full-time' | 'Part-time';
+    description: string;
+    link: string;
+    postedById: number;
+}
+interface LostFoundItem {
+    id: number;
+    type: 'lost' | 'found';
+    itemName: string;
+    description: string;
+    location: string;
+    postedById: number;
+    timestamp: number;
+}
+interface PublicNote extends Document {
+    title: string;
+    authorId: number;
+}
+interface Flashcard {
+    id: number;
+    front: string;
+    back: string;
+}
+interface FlashcardSet {
+    id: number;
+    title: string;
+    courseCode: string;
+    creatorId: number;
+    cards: Flashcard[];
+}
+
+
+// --- CONFIGURATION & INITIAL DATA ---
 const ADMIN_EMAIL = 'oladoyeheritage445@gmail.com';
-const INITIAL_MATRIC_NUMBERS = [
-    "2024013417", "2023011476", "2024003355", "2024003476", "2024003486", "2024003513", "2024003516", "2024003580", "2024003583", "2024003607", "2024013214", "2024003667", "2024003692", "2024003712", "2024003741", "2024003770", "2024003869", "2024003999", "2024004028", "2024004029", "2024004099", "2024013216", "2024004177", "2024004271", "2024004308", "2024004334", "2024004407", "2024004417", "2024004487", "2024004507", "2024004527", "2024004576", "2024013223", "2024004590", "2024004622", "2024004637", "2024004691", "2024004703", "2024004723", "2024004794", "2024004798", "2024004808", "2024004869", "2024013378", "2024004891", "2024004893", "2024004895", "2024004932", "2024004947", "2024004956", "2024004962", "2024004973", "2024005008", "2024005013", "2024013391", "2024005068", "2024005150", "2024005156", "2024005157", "2024005182", "2024005345", "2024005353", "2024005378", "2024005477", "2024005507", "2024005508", "2024005528", "2024005546", "2024005655", "2024005738", "2024005753", "2024005754", "2024005797", "2024005847", "2024005864", "2024005867", "2024005916", "2024006090", "2024006118", "2024006125", "2024006136", "2024006143", "2024006150", "2024006162", "2024006198", "2024006437", "2024006447", "2024006477", "2024006510", "2024006513", "2024006550", "2024006564", "2024006597", "2024006626", "2024006686", "2024006705", "2024006820", "2024006896", "2024006904", "2024006969", "2024006978", "2024006998", "2024007000", "2024007087", "2024007117", "2024007153", "2024007169", "2024007175", "2024007310", "2024007325", "2024007467", "2024007512", "2024007527", "2024007578", "2024007587", "2024007588", "2024007589", "2024007663", "2024007675", "2024007681", "2024007693", "2024007696", "2024007744", "2024007756", "2024007796", "2024007814", "2024007823", "2024007944", "2024007974", "2024007977", "2024008002", "2024008028", "2024008059", "2024008076", "2024008087", "2024008233", "2024008338", "2024008357", "2024008415", "2024008420", "2024008458", "2024008554", "2024008575", "2024008612", "2024008680", "2024008710", "2024008757", "2024008761", "2024008777", "2024008838", "2024008890", "2024008929", "2024008942", "2024008971", "2024009104", "2024009209", "2024009324", "2024009342", "2024009347", "2024009384", "2024009455", "2024009461", "2024009479", "2024009537", "2024009587", "2024009652", "2024009736", "2024009834", "2024009872", "2024009874", "2024009932", "2024009937", "2024009967", "2024010177", "2024010178", "2024010194", "2024010213", "2024010379", "2024010502", "2024010544", "2024010624", "2024010690", "2024010710", "2024010829", "2024010853", "2024010866", "2024010883", "2024010985", "2024011008", "2024011028", "2024011047", "2024011048", "2024011125", "2024011144", "2024011160", "2024011162", "2024011316", "2024011351", "2024011367", "2024011464", "2024011522", "2024011526", "2024011567", "2024011593", "2024011630", "2024011850", "2024011924", "2024012314", "2024012318", "2024012400", "2024012493", "2024012547", "2024012628", "2024012666", "2024012674", "2024012792", "2024012879", "2024012918", "2024012939", "2024013017", "2024013035", "2024013060", "2024013164", "2024013180",
-    'ADMIN/001'
-];
-
-const INITIAL_COURSES_DATA = {
+const INITIAL_MATRIC_NUMBERS = [ "2024013417", "2023011476", "2024003355", "ADMIN/001", "2024003476", "2024003486", "2024003513", "2024003516", "2024003580", "2024003583", "2024003607", "2024013214", "2024003667", "2024003692", "2024003712", "2024003741", "2024003770", "2024003869", "2024003999", "2024004028", "2024004029", "2024004099", "2024013216", "2024004177", "2024004271", "2024004308", "2024004334", "2024004407", "2024004417", "2024004487", "2024004507", "2024004527", "2024004576", "2024013223", "2024004590", "2024004622", "2024004637", "2024004691", "2024004703", "2024004723", "2024004794", "2024004798", "2024004808", "2024004869", "2024013378", "2024004891", "2024004893", "2024004895", "2024004932", "2024004947", "2024004956", "2024004962", "2024004973", "2024005008", "2024005013", "2024013391", "2024005068", "2024005150", "2024005156", "2024005157", "2024005182", "2024005345", "2024005353", "2024005378", "2024005477", "2024005507", "2024005508", "2024005528", "2024005546", "2024005655", "2024005738", "2024005753", "2024005754", "2024005797", "2024005847", "2024005864", "2024005867", "2024005916", "2024006090", "2024006118", "2024006125", "2024006136", "2024006143", "2024006150", "2024006162", "2024006198", "2024006437", "2024006447", "2024006477", "2024006510", "2024006513", "2024006550", "2024006564", "2024006597", "2024006626", "2024006686", "2024006705", "2024006820", "2024006896", "2024006904", "2024006969", "2024006978", "2024006998", "2024007000", "2024007087", "2024007117", "2024007153", "2024007169", "2024007175", "2024007310", "2024007325", "2024007467", "2024007512", "2024007527", "2024007578", "2024007587", "2024007588", "2024007589", "2024007663", "2024007675", "2024007681", "2024007693", "2024007696", "2024007744", "2024007756", "2024007796", "2024007814", "2024007823", "2024007944", "2024007974", "2024007977", "2024008002", "2024008028", "2024008059", "2024008076", "2024008087", "2024008233", "2024008338", "2024008357", "2024008415", "2024008420", "2024008458", "2024008554", "2024008575", "2024008612", "2024008680", "2024008710", "2024008757", "2024008761", "2024008777", "2024008838", "2024008890", "2024008929", "2024008942", "2024008971", "2024009104", "2024009209", "2024009324", "2024009342", "2024009347", "2024009384", "2024009455", "2024009461", "2024009479", "2024009537", "2024009587", "2024009652", "2024009736", "2024009834", "2024009872", "2024009874", "2024009932", "2024009937", "2024009967", "2024010177", "2024010178", "2024010194", "2024010213", "2024010379", "2024010502", "2024010544", "2024010624", "2024010690", "2024010710", "2024010829", "2024010853", "2024010866", "2024010883", "2024010985", "2024011008", "2024011028", "2024011047", "2024011048", "2024011125", "2024011144", "2024011160", "2024011162", "2024011316", "2024011351", "2024011367", "2024011464", "2024011522", "2024011526", "2024011567", "2024011593", "2024011630", "2024011850", "2024011924", "2024012314", "2024012318", "2024012400", "2024012493", "2024012547", "2024012628", "2024012666", "2024012674", "2024012792", "2024012879", "2024012918", "2024012939", "2024013017", "2024013035", "2024013060", "2024013164", "2024013180" ];
+const INITIAL_COURSES_DATA: CoursesData = {
     "100 Level": {
         "Harmattan Semester": [
-            { id: 101, code: "GST 111", title: "Communication in English", units: "2 units" }, { id: 102, code: "ECO 101", title: "Principles of Economics I", units: "2 units" }, { id: 103, code: "ECO 103", title: "Introductory Mathematics I", units: "2 units" }, { id: 104, code: "ECO 105", title: "Intro to Statistics for Social Sciences I", units: "2 units" }, { id: 105, code: "ECO 107", title: "Introduction to Finance", units: "2 units" }, { id: 106, code: "LIB 101", title: "Use of Library, Study Skills & ICT", units: "2 units" }, { id: 107, code: "ACC 101", title: "Principles of Accounting I", units: "2 units" }, { id: 108, code: "MKT 101", title: "Elements of Marketing I", units: "2 units" }, { id: 109, code: "SOC 111", title: "Intergroup Relations & Social Development", units: "2 units" }, { id: 110, code: "PHL 109", title: "Philosophical Problems and Analysis", units: "2 units" }, { id: 111, code: "ECO XXX", title: "Introduction to Digital (Elective)", units: "2 units" }
-        ], "Rain Semester": [
-            { id: 112, code: "GST 112", title: "Nigerian People and Culture", units: "2 units" }, { id: 113, code: "ECO 102", title: "Principles of Economics II", units: "3 units" }, { id: 114, code: "ECO 104", title: "Introductory Mathematics II", units: "2 units" }, { id: 115, code: "ECO 106", title: "Stats for Social Sciences II", units: "2 units" }, { id: 116, code: "ECO 108", title: "Intro to Information Technology", units: "3 units" }, { id: 117, code: "ACC 102", title: "Principles of Accounting II", units: "3 units" }, { id: 118, code: "MKT 102", title: "Elements of Marketing II", units: "2 units" }, { id: 119, code: "ENG 104", title: "Basic Writing Skills", units: "2 units" }, { id: 120, code: "POL 104", title: "Nigerian Legal System (Elective)", units: "2 units" }
+            { id: 101, code: "GST 111", title: "Communication in English", units: "2" },
+            { id: 102, code: "ECO 101", title: "Principles of Economics I", units: "2" },
+            { id: 103, code: "ECO 103", title: "Introductory Mathematics I", units: "2" },
+            { id: 104, code: "ECO 105", title: "Intro to Statistics for Social Sciences I", units: "2" },
+            { id: 105, code: "ECO 107", title: "Introduction to Finance", units: "2" },
+            { id: 106, code: "LIB 101", title: "Use of Library, Study Skills & ICT", units: "2" },
+            { id: 107, code: "ACC 101", title: "Principles of Accounting I", units: "2" },
+            { id: 108, code: "MKT 101", title: "Elements of Marketing I", units: "2" },
+            { id: 109, code: "SOC 111", title: "Intergroup Relations & Social Development", units: "2" },
+            { id: 110, code: "PHL 109", title: "Philosophical Problems and Analysis", units: "2" },
+            { id: 111, code: "ECO XXX", title: "Introduction to Digital (Elective)", units: "2" }
+        ],
+        "Rain Semester": [
+            { id: 112, code: "GST 112", title: "Nigerian People and Culture", units: "2" },
+            { id: 113, code: "ECO 102", title: "Principles of Economics II", units: "3" },
+            { id: 114, code: "ECO 104", title: "Introductory Mathematics II", units: "2" },
+            { id: 115, code: "ECO 106", title: "Stats for Social Sciences II", units: "2" },
+            { id: 116, code: "ECO 108", title: "Intro to Information Technology", units: "3" },
+            { id: 117, code: "ACC 102", title: "Principles of Accounting II", units: "3" },
+            { id: 118, code: "MKT 102", title: "Elements of Marketing II", units: "2" },
+            { id: 119, code: "ENG 104", title: "Basic Writing Skills", units: "2" },
+            { id: 120, code: "POL 104", title: "Nigerian Legal System (Elective)", units: "2" }
         ]
     },
     "200 Level": {
         "Harmattan Semester": [
-            { id: 201, code: "ENT 211", title: "Entrepreneurship and Innovation", units: "2 units" }, { id: 202, code: "ECO 201", title: "Introduction to Micro Economics I", units: "2 units" }, { id: 203, code: "ECO 203", title: "Introduction to Macro Economics I", units: "2 units" }, { id: 204, code: "ECO 205", title: "Structure of Nigerian Economy", units: "2 units" }, { id: 205, code: "ECO 207", title: "Mathematics for Economists I", units: "2 units" }, { id: 206, code: "ECO 209", title: "Statistics for Economists I", units: "2 units" }, { id: 207, code: "ECO 211", title: "Public Finance", units: "2 units" }, { id: 208, code: "HIS 207", title: "History of the Commonwealth", units: "2 units" }, { id: 209, code: "ECO 213", title: "Urban and Regional Economics (Elective)", units: "2 units" }
-        ], "Rain Semester": [
-            { id: 210, code: "GST 212", title: "Philosophy, Logic and Human Existence", units: "2 units" }, { id: 211, code: "SSC 202", title: "Introduction to Computer", units: "3 units" }, { id: 212, code: "ECO 202", title: "Micro Economics II", units: "2 units" }, { id: 213, code: "ECO 204", title: "Macro Economics II", units: "2 units" }, { id: 214, code: "ECO 206", title: "History of Economic Thought", units: "2 units" }, { id: 215, code: "ECO 208", title: "Math for Economists II", units: "2 units" }, { id: 216, code: "ECO 210", title: "Statistics for Economists II", units: "2 units" }, { id: 217, code: "ECO 214", title: "Transport Economics", units: "2 units" }, { id: 218, code: "ECO 216", title: "Labour Economics", units: "2 units" }
+            { id: 201, code: "ENT 211", title: "Entrepreneurship and Innovation", units: "2" },
+            { id: 202, code: "ECO 201", title: "Introduction to Micro Economics I", units: "2" },
+            { id: 203, code: "ECO 203", title: "Introduction to Macro Economics I", units: "2" },
+            { id: 204, code: "ECO 205", title: "Structure of Nigerian Economy", units: "2" },
+            { id: 205, code: "ECO 207", title: "Mathematics for Economists I", units: "2" },
+            { id: 206, code: "ECO 209", title: "Statistics for Economists I", units: "2" },
+            { id: 207, code: "ECO 211", title: "Public Finance", units: "2" },
+            { id: 208, code: "HIS 207", title: "History of the Commonwealth", units: "2" },
+            { id: 209, code: "ECO 213", title: "Urban and Regional Economics (Elective)", units: "2" }
+        ],
+        "Rain Semester": [
+            { id: 210, code: "GST 212", title: "Philosophy, Logic and Human Existence", units: "2" },
+            { id: 211, code: "SSC 202", title: "Introduction to Computer", units: "3" },
+            { id: 212, code: "ECO 202", title: "Micro Economics II", units: "2" },
+            { id: 213, code: "ECO 204", title: "Macro Economics II", units: "2" },
+            { id: 214, code: "ECO 206", title: "History of Economic Thought", units: "2" },
+            { id: 215, code: "ECO 208", title: "Math for Economists II", units: "2" },
+            { id: 216, code: "ECO 210", title: "Statistics for Economists II", units: "2" },
+            { id: 217, code: "ECO 214", title: "Transport Economics", units: "2" },
+            { id: 218, code: "ECO 216", title: "Labour Economics", units: "2" }
         ]
     },
-    "300 Level": {
+     "300 Level": {
         "Harmattan Semester": [
-            { id: 301, code: "SSC 301", title: "Innovation in Social Sciences", units: "2 units" }, { id: 302, code: "ECO 301", title: "Intermediate Micro I", units: "2 units" }, { id: 303, code: "ECO 303", title: "Intermediate Macro I", units: "2 units" }, { id: 304, code: "ECO 305", title: "History of Economic Thoughts", units: "2 units" }, { id: 305, code: "ECO 307", title: "Project Evaluation", units: "3 units" }, { id: 306, code: "ECO 309", title: "Econometrics", units: "2 units" }, { id: 307, code: "ECO 311", title: "Monetary Economics I", units: "2 units" }, { id: 308, code: "ECO 313", title: "International Economics I", units: "2 units" }, { id: 309, code: "ECO 315", title: "Economics of Development", units: "2 units" }
-        ], "Rain Semester": [
-            { id: 310, code: "GST 312", title: "Peace and Conflict Resolution", units: "2 units" }, { id: 311, code: "ENT 312", title: "Venture Creation", units: "2 units" }, { id: 312, code: "SSC 302", title: "Research Methods I", units: "2 units" }, { id: 313, code: "ECO 302", title: "Intermediate Micro II", units: "2 units" }, { id: 314, code: "ECO 304", title: "Intermediate Macro II", units: "2 units" }, { id: 315, code: "ECO 306", title: "Introductory Econometrics", units: "3 units" }, { id: 316, code: "ECO 308", title: "Operation Research", units: "2 units" }, { id: 317, code: "ECO 310", title: "Public Sector Economics", units: "2 units" }, { id: 318, code: "ECO 312", title: "Monetary Economics II", units: "2 units" }, { id: 319, code: "ECO 314", title: "International Economics II", units: "2 units" }, { id: 320, code: "ECO 3XX", title: "Industrial Economics (Elective)", units: "2 units" }
+            { id: 301, code: "SSC 301", title: "Innovation in Social Sciences", units: "2" },
+            { id: 302, code: "ECO 301", title: "Intermediate Micro I", units: "2" },
+            { id: 303, code: "ECO 303", title: "Intermediate Macro I", units: "2" },
+            { id: 304, code: "ECO 305", title: "History of Economic Thoughts", units: "2" },
+            { id: 305, code: "ECO 307", title: "Project Evaluation", units: "3" },
+            { id: 306, code: "ECO 309", title: "Econometrics", units: "2" },
+            { id: 307, code: "ECO 311", title: "Monetary Economics I", units: "2" },
+            { id: 308, code: "ECO 313", title: "International Economics I", units: "2" },
+            { id: 309, code: "ECO 315", title: "Economics of Development", units: "2" }
+        ],
+        "Rain Semester": [
+            { id: 310, code: "GST 312", title: "Peace and Conflict Resolution", units: "2" },
+            { id: 311, code: "ENT 312", title: "Venture Creation", units: "2" },
+            { id: 312, code: "SSC 302", title: "Research Methods I", units: "2" },
+            { id: 313, code: "ECO 302", title: "Intermediate Micro II", units: "2" },
+            { id: 314, code: "ECO 304", title: "Intermediate Macro II", units: "2" },
+            { id: 315, code: "ECO 306", title: "Introductory Econometrics", units: "3" },
+            { id: 316, code: "ECO 308", title: "Operation Research", units: "2" },
+            { id: 317, code: "ECO 310", title: "Public Sector Economics", units: "2" },
+            { id: 318, code: "ECO 312", title: "Monetary Economics II", units: "2" },
+            { id: 319, code: "ECO 314", title: "International Economics II", units: "2" },
+            { id: 320, code: "ECO 3XX", title: "Industrial Economics (Elective)", units: "2" }
         ]
     },
     "400 Level": {
         "Harmattan Semester": [
-            { id: 401, code: "SSC 401", title: "Research Methods II", units: "2 units" }, { id: 402, code: "ECO 401", title: "Advanced Microeconomics", units: "2 units" }, { id: 403, code: "ECO 403", title: "Advanced Macroeconomics", units: "2 units" }, { id: 404, code: "ECO 405", title: "Economic Planning", units: "3 units" }, { id: 405, code: "ECO 407", title: "Fiscal Policy and Analysis", units: "3 units" }, { id: 406, code: "ECO 409", title: "Comparative Economic Systems", units: "2 units" }, { id: 407, code: "ECO 411", title: "Advanced Mathematical Economics", units: "2 units" }, { id: 408, code: "ECO 413", title: "Development: Problems & Policies", units: "2 units" }, { id: 409, code: "ECO 415", title: "Economics of Production OR ECO 417 – Petroleum Economics", units: "2 units" }
-        ], "Rain Semester": [
-            { id: 410, code: "ECO 402", title: "Advanced Microeconomics II", units: "2 units" }, { id: 411, code: "ECO 404", title: "Advanced Macroeconomics II", units: "2 units" }, { id: 412, code: "ECO 406", title: "Project Evaluation II", units: "2 units" }, { id: 413, code: "ECO 408", title: "Economic Planning II", units: "2 units" }, { id: 414, code: "ECO 410", title: "Applied Statistics", units: "2 units" }, { id: 415, code: "ECO 499", title: "Final Year Project", units: "6 units" }, { id: 416, code: "ECO 412", title: "Advanced Econometrics OR ECO 414 – Health Economics", units: "2 units" }
+            { id: 401, code: "SSC 401", title: "Research Methods II", units: "2" },
+            { id: 402, code: "ECO 401", title: "Advanced Microeconomics", units: "2" },
+            { id: 403, code: "ECO 403", title: "Advanced Macroeconomics", units: "2" },
+            { id: 404, code: "ECO 405", title: "Economic Planning", units: "3" },
+            { id: 405, code: "ECO 407", title: "Fiscal Policy and Analysis", units: "3" },
+            { id: 406, code: "ECO 409", title: "Comparative Economic Systems", units: "2" },
+            { id: 407, code: "ECO 411", title: "Advanced Mathematical Economics", units: "2" },
+            { id: 408, code: "ECO 413", title: "Development: Problems & Policies", units: "2" },
+            { id: 409, code: "ECO 415/417", title: "Econs of Production / Petroleum Econs", units: "2" }
+        ],
+        "Rain Semester": [
+            { id: 410, code: "ECO 402", title: "Advanced Microeconomics II", units: "2" },
+            { id: 411, code: "ECO 404", title: "Advanced Macroeconomics II", units: "2" },
+            { id: 412, code: "ECO 406", title: "Project Evaluation II", units: "2" },
+            { id: 413, code: "ECO 408", title: "Economic Planning II", units: "2" },
+            { id: 414, code: "ECO 410", title: "Applied Statistics", units: "2" },
+            { id: 415, code: "ECO 499", title: "Final Year Project", units: "6" },
+            { id: 416, code: "ECO 412/414", title: "Advanced Econometrics / Health Econs", units: "2" }
         ]
     }
 };
+const INITIAL_FACULTY: Faculty[] = [
+    { id: 1, name: "Dr. Adekunle Gold", title: "Head of Department", email: "agold@lautech.edu", office: "ECO-101", courses: ["ECO 401", "ECO 403"], profilePicture: "https://api.dicebear.com/7.x/adventurer/svg?seed=Adekunle" },
+    { id: 2, name: "Prof. Bisola Aiyeola", title: "Professor", email: "baiyeola@lautech.edu", office: "ECO-102", courses: ["ECO 301", "ECO 303"], profilePicture: "https://api.dicebear.com/7.x/adventurer/svg?seed=Bisola" },
+    { id: 3, name: "Mr. Chike Eze", title: "Lecturer I", email: "ceze@lautech.edu", office: "ECO-201", courses: ["ECO 201", "ECO 203"], profilePicture: "https://api.dicebear.com/7.x/adventurer/svg?seed=Chike" },
+    { id: 4, name: "Mrs. Dolapo Otedola", title: "Lecturer II", email: "dotedola@lautech.edu", office: "ECO-205", courses: ["ECO 101", "ECO 102"], profilePicture: "https://api.dicebear.com/7.x/adventurer/svg?seed=Dolapo" },
+];
+
+const ALL_COURSE_CODES = [...new Set(Object.values(INITIAL_COURSES_DATA).flatMap(s => Object.values(s).flat()).map(c => c.code))].sort();
+
 
 // --- HOOKS ---
-const useLocalStorage = (key, initialValue) => {
-    const [storedValue, setStoredValue] = useState(() => {
+const useLocalStorage = <T,>(key: string, initialValue: T): [T, (value: T | ((val: T) => T)) => void] => {
+    const [storedValue, setStoredValue] = useState<T>(() => {
         try {
             const item = window.localStorage.getItem(key);
-            // If there's no item in storage, return the initial value.
-            if (item === null) {
-                return initialValue;
-            }
-            
-            const value = JSON.parse(item);
-
-            // This is a safeguard against data corruption. If a stored value's type
-            // doesn't match what the application expects, we fall back to the initial value.
-            const isObjectLike = (v) => v !== null && typeof v === 'object';
-            
-            // Case 1: Initial value is an object, but the stored value isn't. Reset.
-            if (isObjectLike(initialValue) && !isObjectLike(value)) {
-                 return initialValue;
-            }
-            
-            // Case 2: Initial value is null (e.g., for a logged-out user), but the stored
-            // value is a primitive (not an object). This indicates corruption. Reset to null.
-            if (initialValue === null && value !== null && !isObjectLike(value)) {
-                return initialValue;
-            }
-            
+            if (item === null) return initialValue;
+            const value = JSON.parse(item) as T;
             return value;
         } catch (error) {
             console.error(error);
@@ -74,7 +317,7 @@ const useLocalStorage = (key, initialValue) => {
         }
     });
 
-    const setValue = (value) => {
+    const setValue = (value: T | ((val: T) => T)) => {
         try {
             const valueToStore = value instanceof Function ? value(storedValue) : value;
             setStoredValue(valueToStore);
@@ -83,14 +326,28 @@ const useLocalStorage = (key, initialValue) => {
             console.error(error);
         }
     };
-
     return [storedValue, setValue];
 };
 
+// --- UTILS ---
+const getFileAsBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+    });
+};
 
 // --- AUTHENTICATION & MEMBERS-ONLY COMPONENTS ---
 
-const AuthPage = ({ onSignIn, onSignUp, users, approvedMatricNumbers }) => {
+interface AuthPageProps {
+    onSignIn: (user: User) => void;
+    onSignUp: (formData: SignUpFormData) => void;
+    users: User[];
+    approvedMatricNumbers: string[];
+}
+const AuthPage = ({ onSignIn, onSignUp, users, approvedMatricNumbers }: AuthPageProps) => {
     const [isSignUp, setIsSignUp] = useState(false);
     return (
         <div className="auth-page-wrapper">
@@ -99,11 +356,13 @@ const AuthPage = ({ onSignIn, onSignUp, users, approvedMatricNumbers }) => {
                     <h1 className="logo">LAUTECH Economics '29</h1>
                     <h2>Community Portal</h2>
                 </div>
-                {isSignUp ? (
-                    <SignUpForm onSignUp={onSignUp} users={users} approvedMatricNumbers={approvedMatricNumbers} />
-                ) : (
-                    <SignInForm onSignIn={onSignIn} users={users} />
-                )}
+                <div className="auth-card">
+                    {isSignUp ? (
+                        <SignUpForm onSignUp={onSignUp} users={users} approvedMatricNumbers={approvedMatricNumbers} />
+                    ) : (
+                        <SignInForm onSignIn={onSignIn} users={users} />
+                    )}
+                </div>
                 <p className="auth-switch">
                     {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
                     <a href="#" onClick={(e) => { e.preventDefault(); setIsSignUp(!isSignUp); }}>
@@ -115,70 +374,69 @@ const AuthPage = ({ onSignIn, onSignUp, users, approvedMatricNumbers }) => {
     );
 };
 
-const SignUpForm = ({ onSignUp, users, approvedMatricNumbers }) => {
+interface SignUpFormProps {
+    onSignUp: (formData: SignUpFormData) => void;
+    users: User[];
+    approvedMatricNumbers: string[];
+}
+const SignUpForm = ({ onSignUp, users, approvedMatricNumbers }: SignUpFormProps) => {
     const [formData, setFormData] = useState({ firstName: '', otherName: '', surname: '', username: '', email: '', matricNumber: '', password: '' });
     const [error, setError] = useState('');
 
-    const handleChange = (e) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value.trim() }));
     };
 
-    const handleSignUp = (e) => {
+    const handleSignUp = (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
-
-        if (!approvedMatricNumbers.includes(formData.matricNumber)) {
-            setError('This matric number is not on the approved list. Please contact your administrator.');
+        if (!approvedMatricNumbers.includes(formData.matricNumber.toUpperCase())) {
+            setError('This matric number is not on the approved list.');
             return;
         }
-        if (users.some(user => user.matricNumber === formData.matricNumber)) {
+        if (users.some(user => user.matricNumber.toUpperCase() === formData.matricNumber.toUpperCase())) {
             setError('This matric number has already been registered.');
             return;
         }
-        if (users.some(user => user.email === formData.email)) {
-            setError('This email address is already in use.');
-            return;
-        }
-        if (users.some(user => user.username === formData.username)) {
-            setError('This username is already taken.');
-            return;
-        }
-
         onSignUp(formData);
     };
 
     return (
-        <div className="card auth-card">
-            <h3 className="auth-title">Create Account</h3>
+        <>
+            <h3 className="auth-title">Create Your Account</h3>
             <form onSubmit={handleSignUp} className="auth-form">
                 {error && <p className="error-message">{error}</p>}
-                <div className="form-group"><label htmlFor="firstName">First Name</label><input type="text" id="firstName" name="firstName" value={formData.firstName} onChange={handleChange} required /></div>
-                <div className="form-group"><label htmlFor="otherName">Other Name</label><input type="text" id="otherName" name="otherName" value={formData.otherName} onChange={handleChange} /></div>
-                <div className="form-group"><label htmlFor="surname">Surname</label><input type="text" id="surname" name="surname" value={formData.surname} onChange={handleChange} required /></div>
-                <div className="form-group"><label htmlFor="username">Username</label><input type="text" id="username" name="username" value={formData.username} onChange={handleChange} required /></div>
-                <div className="form-group"><label htmlFor="email">Email Address</label><input type="email" id="email" name="email" value={formData.email} onChange={handleChange} required /></div>
-                <div className="form-group"><label htmlFor="matricNumber">Matric Number</label><input type="text" id="matricNumber" name="matricNumber" value={formData.matricNumber} onChange={handleChange} required /></div>
-                <div className="form-group"><label htmlFor="password">Password</label><input type="password" id="password" name="password" value={formData.password} onChange={handleChange} required /></div>
-                <button type="submit" className="btn-primary">Sign Up</button>
+                <div className="form-group"><input type="text" name="firstName" placeholder="First Name" value={formData.firstName} onChange={handleChange} required /></div>
+                <div className="form-group"><input type="text" name="otherName" placeholder="Other Name" value={formData.otherName} onChange={handleChange} /></div>
+                <div className="form-group"><input type="text" name="surname" placeholder="Surname" value={formData.surname} onChange={handleChange} required /></div>
+                <div className="form-group"><input type="text" name="username" placeholder="Username" value={formData.username} onChange={handleChange} required /></div>
+                <div className="form-group"><input type="email" name="email" placeholder="Email Address" value={formData.email} onChange={handleChange} required /></div>
+                <div className="form-group"><input type="text" name="matricNumber" placeholder="Matric Number" value={formData.matricNumber} onChange={handleChange} required /></div>
+                <div className="form-group"><input type="password" name="password" placeholder="Password" value={formData.password} onChange={handleChange} required /></div>
+                <button type="submit" className="btn-primary" style={{width: '100%'}}>Sign Up</button>
             </form>
-        </div>
+        </>
     );
 };
 
-const SignInForm = ({ onSignIn, users }) => {
+interface SignInFormProps {
+    onSignIn: (user: User) => void;
+    users: User[];
+}
+const SignInForm = ({ onSignIn, users }: SignInFormProps) => {
     const [formData, setFormData] = useState({ matricNumber: '', password: '' });
     const [error, setError] = useState('');
 
-    const handleChange = (e) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleSignIn = (e) => {
+    const handleSignIn = (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
-        const user = users.find(u => u.matricNumber === formData.matricNumber && u.password === formData.password);
+        const user = users.find(u => u.matricNumber.toUpperCase() === formData.matricNumber.toUpperCase() && u.password === formData.password);
         if (user) {
             if (user.status === 'banned' || user.status === 'suspended') {
                  setError(`Your account has been ${user.status}. Please contact an administrator.`);
@@ -191,178 +449,163 @@ const SignInForm = ({ onSignIn, users }) => {
     };
 
     return (
-        <div className="card auth-card">
-            <h3 className="auth-title">Sign In</h3>
+        <>
+            <h3 className="auth-title">Welcome Back!</h3>
             <form onSubmit={handleSignIn} className="auth-form">
                 {error && <p className="error-message">{error}</p>}
-                <div className="form-group"><label htmlFor="matricNumber">Matric Number</label><input type="text" id="matricNumber" name="matricNumber" value={formData.matricNumber} onChange={handleChange} required /></div>
-                <div className="form-group"><label htmlFor="password">Password</label><input type="password" id="password" name="password" value={formData.password} onChange={handleChange} required /></div>
-                <button type="submit" className="btn-primary">Sign In</button>
+                <div className="form-group"><input type="text" name="matricNumber" placeholder="Matric Number" value={formData.matricNumber} onChange={handleChange} required /></div>
+                <div className="form-group"><input type="password" name="password" placeholder="Password" value={formData.password} onChange={handleChange} required /></div>
+                <button type="submit" className="btn-primary" style={{width: '100%'}}>Sign In</button>
             </form>
+        </>
+    );
+};
+
+
+// --- LAYOUT COMPONENTS ---
+interface SidebarProps {
+    route: Route;
+    setRoute: (route: Route) => void;
+    isSidebarOpen: boolean;
+}
+const Sidebar = ({ route, setRoute, isSidebarOpen }: SidebarProps) => {
+    const navLinks = [
+        { page: 'home', label: 'Home' },
+        { page: 'announcements', label: 'Announcements' },
+        { page: 'courses', label: 'Courses' },
+        { page: 'coursePlanner', label: 'Course Planner' },
+        { page: 'faculty', label: 'Faculty Directory' },
+        { page: 'assignments', label: 'Assignments' },
+        { page: 'resourceLibrary', label: 'Resource Library' },
+        { page: 'quizzes', label: 'Quizzes' },
+        { page: 'flashcards', label: 'Flashcards' },
+        { page: 'gradebook', label: 'Gradebook' },
+        { page: 'gpaCalculator', label: 'GPA Calculator' },
+        { page: 'forums', label: 'Forums' },
+        { page: 'polls', label: 'Polls & Surveys' },
+        { page: 'calendar', label: 'Calendar' },
+        { page: 'members', label: 'Members Directory' },
+        { page: 'messages', label: 'Messages' },
+        { page: 'tutoring', label: 'Tutoring Marketplace' },
+        { page: 'jobs', label: 'Job Board' },
+        { page: 'lostAndFound', label: 'Lost & Found' },
+        { page: 'publicNotes', label: 'Public Notes' },
+    ];
+
+    return (
+        <aside className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
+            <div className="sidebar-header">
+                <h1 className="logo">ECO'29</h1>
+            </div>
+            <nav className="sidebar-nav">
+                {navLinks.map(link => (
+                    <a
+                        href="#"
+                        key={link.page}
+                        className={route.page === link.page ? 'active' : ''}
+                        onClick={(e) => { e.preventDefault(); setRoute({ page: link.page }); }}
+                    >
+                        {link.label}
+                    </a>
+                ))}
+            </nav>
+        </aside>
+    );
+};
+
+interface NotificationBellProps {
+    notifications: Notification[];
+    setRoute: (route: Route) => void;
+    onMarkAsRead: (notificationId: number) => void;
+}
+const NotificationBell = ({ notifications, setRoute, onMarkAsRead }: NotificationBellProps) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const unreadCount = notifications.filter(n => !n.read).length;
+
+    const handleNotificationClick = (notification: Notification) => {
+        if (!notification.read) {
+            onMarkAsRead(notification.id);
+        }
+        if (notification.link) {
+            setRoute(notification.link);
+        }
+        setIsOpen(false);
+    };
+
+    return (
+        <div className="notification-bell">
+            <button onClick={() => setIsOpen(!isOpen)} className="notification-btn" aria-label={`Notifications (${unreadCount} unread)`}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                {unreadCount > 0 && <span className="notification-badge">{unreadCount}</span>}
+            </button>
+            {isOpen && (
+                <div className="notification-dropdown">
+                    <div className="notification-header">
+                        <h4>Notifications</h4>
+                    </div>
+                    {notifications.length > 0 ? (
+                        <ul className="notification-list">
+                            {notifications.map(n => (
+                                <li key={n.id} className={n.read ? 'read' : 'unread'} onClick={() => handleNotificationClick(n)}>
+                                    <p>{n.text}</p>
+                                    <small>{new Date(n.timestamp).toLocaleString()}</small>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p className="no-notifications">No new notifications.</p>
+                    )}
+                </div>
+            )}
         </div>
     );
 };
 
-const ProfilePage = ({ currentUser, onProfileUpdate }) => {
-    const [isEditing, setIsEditing] = useState(false);
-    const [formData, setFormData] = useState({ username: currentUser.username });
-    const [profilePicture, setProfilePicture] = useState(currentUser.profilePicture || null);
-
-    const handleFileChange = (e) => {
-        if (e.target.files && e.target.files[0]) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                setProfilePicture(event.target.result);
-            };
-            reader.readAsDataURL(e.target.files[0]);
-        }
-    };
-
-    const handleSave = () => {
-        onProfileUpdate({ ...formData, profilePicture });
-        setIsEditing(false);
-    };
-
+interface HeaderProps {
+    currentUser: CurrentUser;
+    onSignOut: () => void;
+    notifications: Notification[];
+    setRoute: (route: Route) => void;
+    onMarkAsRead: (notificationId: number) => void;
+    onToggleSidebar: () => void;
+}
+const Header = ({ currentUser, onSignOut, notifications, setRoute, onMarkAsRead, onToggleSidebar }: HeaderProps) => {
+    const isAdmin = currentUser.role === 'Class President' || currentUser.role === 'Admin';
     return (
-    <div className="page-container">
-        <div className="container auth-container">
-            <h1 className="page-title">My Profile</h1>
-            <div className="card profile-card">
-                <div className="profile-header">
-                    <div className="profile-pic-container">
-                         <img src={profilePicture || `https://api.dicebear.com/7.x/initials/svg?seed=${currentUser.fullName}`} alt="Profile" className="profile-pic" />
-                         {isEditing && <input type="file" accept="image/*" onChange={handleFileChange} />}
-                    </div>
-                    <div>
-                        <h2>{currentUser.fullName}</h2>
-                        <p><strong>Matric No:</strong> {currentUser.matricNumber}</p>
-                        <p><strong>Role:</strong> <span className={`role-badge ${currentUser.role.toLowerCase().replace(/[\s_]/g, '-')}`}>{currentUser.role}</span></p>
-                    </div>
-                </div>
-
-                <hr />
-                
-                {isEditing ? (
-                    <div className="profile-edit-form">
-                        <div className="form-group">
-                            <label htmlFor="username">Username</label>
-                            <input type="text" id="username" value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})} />
-                        </div>
-                        <div className="profile-edit-actions">
-                            <button className="btn-tertiary" onClick={() => setIsEditing(false)}>Cancel</button>
-                            <button className="btn-secondary" onClick={handleSave}>Save Changes</button>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="profile-details">
-                        <p><strong>Username:</strong> {currentUser.username}</p>
-                        <p><strong>Email:</strong> {currentUser.email}</p>
-                        <button className="btn-edit-profile" onClick={() => setIsEditing(true)}>Edit Profile</button>
-                    </div>
-                )}
+        <header className="header">
+            <button className="sidebar-toggle" onClick={onToggleSidebar} aria-label="Toggle Sidebar">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            </button>
+            <div className="header-controls">
+                {isAdmin && <button className="btn-secondary" onClick={() => setRoute({ page: 'admin' })}>Admin Panel</button>}
+                <NotificationBell notifications={notifications} setRoute={setRoute} onMarkAsRead={onMarkAsRead} />
+                <a href="#" className="header-profile-link" onClick={(e) => { e.preventDefault(); setRoute({ page: 'profile' }); }} title="My Profile">
+                    <img src={currentUser.profilePicture || `https://api.dicebear.com/7.x/initials/svg?seed=${currentUser.fullName}`} alt="Profile" className="header-profile-pic" />
+                    <span>{currentUser.firstName}</span>
+                </a>
+                <button onClick={onSignOut} className="sign-out-btn">Sign Out</button>
             </div>
-        </div>
-    </div>
-)};
+        </header>
+    );
+};
 
-const AdminPage = ({ users, onRoleChange, approvedMatricNumbers, onAddMatricNumber, onUserStatusChange }) => {
-    const [newMatric, setNewMatric] = useState('');
-    const [roleEdits, setRoleEdits] = useState({});
-    
-    const sortedUsers = [...users].sort((a, b) => {
-        const aIsAdmin = a.role === 'Class President' || a.role === 'Admin';
-        const bIsAdmin = b.role === 'Class President' || b.role === 'Admin';
-        if (aIsAdmin && !bIsAdmin) return -1;
-        if (!aIsAdmin && bIsAdmin) return 1;
-        return a.fullName.localeCompare(b.fullName);
-    });
-
-    const handleRoleInputChange = (userId, value) => {
-        setRoleEdits(prev => ({ ...prev, [userId]: value }));
-    };
-
-    const handleRoleSave = (userId) => {
-        if (roleEdits[userId]) {
-            onRoleChange(userId, roleEdits[userId]);
-            setRoleEdits(prev => {
-                const newState = { ...prev };
-                delete newState[userId];
-                return newState;
-            });
-        }
-    };
-    
-    const handleAddMatricSubmit = (e) => {
-        e.preventDefault();
-        if(newMatric.trim()){
-            onAddMatricNumber(newMatric.trim());
-            setNewMatric('');
-        }
-    };
+interface ModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    title: string;
+    children?: React.ReactNode;
+}
+const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
+    if (!isOpen) return null;
 
     return (
-        <div className="page-container">
-            <div className="container">
-                <h1 className="page-title">Admin Dashboard</h1>
-                <p className="page-subtitle">Manage users, roles, and access for the department.</p>
-
-                <div className="card admin-card">
-                    <h3>Add Approved Matriculation Number</h3>
-                    <form onSubmit={handleAddMatricSubmit} className="admin-form">
-                        <input 
-                            type="text" 
-                            value={newMatric} 
-                            onChange={(e) => setNewMatric(e.target.value)}
-                            placeholder="Enter new matric number"
-                        />
-                        <button type="submit" className="btn-secondary">Add Number</button>
-                    </form>
-                    <p>Current approved numbers: {approvedMatricNumbers.length}</p>
+        <div className="modal-backdrop" onClick={onClose}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                    <h3>{title}</h3>
+                    <button onClick={onClose} className="modal-close-btn">&times;</button>
                 </div>
-
-                <div className="card admin-card">
-                    <h3>Manage Users</h3>
-                    <div className="table-container">
-                        <table className="user-table">
-                            <thead>
-                                <tr><th>Full Name</th><th>Role</th><th>Status</th><th>Actions</th></tr>
-                            </thead>
-                            <tbody>
-                                {sortedUsers.map(user => (
-                                    <tr key={user.id}>
-                                        <td>
-                                            {user.fullName}
-                                            {(user.role === 'Admin' || user.role === 'Class President') && <span className="admin-badge">Admin</span>}
-                                        </td>
-                                        <td className="role-management-cell">
-                                            <input
-                                                className="role-input"
-                                                type="text"
-                                                defaultValue={user.role}
-                                                onChange={(e) => handleRoleInputChange(user.id, e.target.value)}
-                                                onBlur={() => handleRoleSave(user.id)}
-                                                disabled={user.role === 'Class President'}
-                                            />
-                                        </td>
-                                        <td><span className={`status-badge status-${user.status || 'active'}`}>{user.status || 'Active'}</span></td>
-                                        <td className="user-actions-cell">
-                                            {user.role !== 'Class President' && (
-                                                <>
-                                                    <button onClick={() => onUserStatusChange(user.id, user.status === 'suspended' ? 'active' : 'suspended')} className={`btn-user-action ${user.status === 'suspended' ? 'btn-un-action' : 'btn-suspend'}`}>
-                                                        {user.status === 'suspended' ? 'Unsuspend' : 'Suspend'}
-                                                    </button>
-                                                    <button onClick={() => onUserStatusChange(user.id, user.status === 'banned' ? 'active' : 'banned')} className={`btn-user-action ${user.status === 'banned' ? 'btn-un-action' : 'btn-ban'}`}>
-                                                        {user.status === 'banned' ? 'Unban' : 'Ban'}
-                                                    </button>
-                                                </>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                {children}
             </div>
         </div>
     );
@@ -371,849 +614,250 @@ const AdminPage = ({ users, onRoleChange, approvedMatricNumbers, onAddMatricNumb
 
 // --- PAGE COMPONENTS ---
 
-const HomePage = ({ setRoute, currentUser, announcements, faculty }) => (
-    <>
-        <Hero currentUser={currentUser} />
-        <section id="announcements-preview" className="content-section">
-            <div className="container">
+interface HomePageProps {
+    currentUser: CurrentUser;
+    announcements: Announcement[];
+}
+const HomePage = ({ currentUser, announcements }: HomePageProps) => (
+    <div>
+        <div className="hero">
+            <h1 className="welcome-message">Welcome, {currentUser.firstName}</h1>
+            <p>Department of Economics Community Portal. Stay connected with course updates, announcements, and fellow students.</p>
+        </div>
+        <div className="home-grid">
+            <section id="announcements-preview" className="content-section">
                 <h2>Latest Announcements</h2>
+                <div className="card">
+                    {announcements.length > 0 ? (
+                        announcements.slice(0, 3).map(item => (
+                            <div key={item.id} style={{padding: '1rem', borderBottom: '1px solid var(--border-color)'}}>
+                                <h3>{item.title}</h3>
+                                <p className="date">{item.date}</p>
+                                <div className="rendered-content" dangerouslySetInnerHTML={{ __html: item.content.substring(0,150) + '...' }}></div>
+                            </div>
+                        ))
+                    ) : (
+                        <p>No announcements yet.</p>
+                    )}
+                </div>
+            </section>
+            <aside>
+                 <div className="card">
+                    <h3>Quick Links</h3>
+                     <nav className="sidebar-nav">
+                        <a href="#">My Courses</a>
+                        <a href="#">My Grades</a>
+                        <a href="#">University Calendar</a>
+                    </nav>
+                 </div>
+            </aside>
+        </div>
+    </div>
+);
+
+interface AnnouncementsPageProps {
+    announcements: Announcement[];
+    currentUser: CurrentUser;
+    onAddAnnouncement: (data: { title: string; content: string; }) => void;
+}
+const AnnouncementsPage = ({ announcements, currentUser, onAddAnnouncement }: AnnouncementsPageProps) => {
+    const [showForm, setShowForm] = useState(false);
+    const [formData, setFormData] = useState({ title: '', content: '' });
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    const isAdmin = currentUser.role === 'Class President' || currentUser.role === 'Admin';
+    
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        setFormData({...formData, [e.target.name]: e.target.value});
+    };
+    
+    const handleFormat = (tag: 'b' | 'i' | 'ul') => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const selectedText = textarea.value.substring(start, end);
+
+        if (tag === 'ul') {
+            const listItems = selectedText.split('\n').map(item => `<li>${item}</li>`).join('');
+            const newText = `<ul>\n${listItems}\n</ul>`;
+             const updatedContent = textarea.value.substring(0, start) + newText + textarea.value.substring(end);
+            setFormData(prev => ({ ...prev, content: updatedContent }));
+        } else {
+            const newText = `<${tag}>${selectedText}</${tag}>`;
+            const updatedContent = textarea.value.substring(0, start) + newText + textarea.value.substring(end);
+            setFormData(prev => ({ ...prev, content: updatedContent }));
+        }
+    }
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (formData.title.trim() && formData.content.trim()) {
+            onAddAnnouncement(formData);
+            setFormData({ title: '', content: '' });
+            setShowForm(false);
+        }
+    };
+
+    return (
+        <div>
+            <div className="page-header-with-action">
+                <div>
+                    <h1 className="page-title">Announcements</h1>
+                    <p className="page-subtitle">Stay up-to-date with the latest news from the department.</p>
+                </div>
+                {isAdmin && <button className="btn-primary" onClick={() => setShowForm(!showForm)}>{showForm ? 'Cancel' : '+ New Announcement'}</button>}
+            </div>
+            {showForm && (
+                 <div className="card">
+                     <form onSubmit={handleSubmit}>
+                        <h3>New Announcement</h3>
+                        <div className="form-group"><label>Title</label><input type="text" name="title" value={formData.title} onChange={handleChange} required /></div>
+                        <div className="form-group rich-text-editor">
+                            <label>Content</label>
+                            <div className="toolbar">
+                                <button type="button" onClick={() => handleFormat('b')}>B</button>
+                                <button type="button" onClick={() => handleFormat('i')}>I</button>
+                                <button type="button" onClick={() => handleFormat('ul')}>List</button>
+                            </div>
+                            <textarea ref={textareaRef} name="content" value={formData.content} onChange={handleChange} required></textarea>
+                        </div>
+                        <div className="form-actions">
+                            <button type="submit" className="btn-secondary">Post</button>
+                        </div>
+                    </form>
+                 </div>
+            )}
+            
+            {announcements.length > 0 ? (
                 <div className="card-grid">
-                    {announcements.slice(0, 3).map((item) => (
+                    {announcements.map((item) => (
                         <div className="card" key={item.id}>
                             <h3>{item.title}</h3>
                             <p className="date">{item.date}</p>
-                            <p>{item.excerpt.substring(0, 100)}...</p>
+                            <div className="rendered-content" dangerouslySetInnerHTML={{ __html: item.content }}></div>
                         </div>
                     ))}
-                     {announcements.length === 0 && <p>No announcements yet.</p>}
                 </div>
-                <div className="view-all-wrapper">
-                    <button onClick={() => setRoute({page: 'announcements'})} className="btn-secondary">View All Announcements</button>
-                </div>
-            </div>
-        </section>
-        {faculty.length > 0 && (
-            <section id="faculty-preview" className="content-section alt-bg">
-                <div className="container">
-                    <h2>Featured Faculty</h2>
-                    <div className="card-grid">
-                        {faculty.slice(0, 3).map((person, index) => (
-                            <div className="card faculty-card" key={person.id || index}>
-                                <div className="faculty-avatar"></div>
-                                <h3>{person.name}</h3>
-                                <p className="title">{person.title}</p>
-                                <p className="area">{person.area}</p>
-                            </div>
-                        ))}
-                    </div>
-                    <div className="view-all-wrapper">
-                        <button onClick={() => setRoute({page: 'faculty'})} className="btn-secondary">Meet All Faculty</button>
-                    </div>
-                </div>
-            </section>
-        )}
-    </>
-);
-
-const AnnouncementsPage = ({ announcements, currentUser, onAddAnnouncement }) => {
-    const [showForm, setShowForm] = useState(false);
-    const [formData, setFormData] = useState({ title: '', excerpt: '' });
-
-    const isAdmin = currentUser.role === 'Class President' || currentUser.role === 'Admin';
-    
-    const handleChange = (e) => {
-        setFormData({...formData, [e.target.name]: e.target.value});
-    };
-
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        if (formData.title.trim() && formData.excerpt.trim()) {
-            onAddAnnouncement(formData);
-            setFormData({ title: '', excerpt: '' });
-            setShowForm(false);
-        }
-    };
-
-    return (
-        <div className="page-container">
-            <div className="container">
-                <h1 className="page-title">Announcements</h1>
-                <p className="page-subtitle">Stay up-to-date with the latest news and events from the Department of Economics.</p>
-                
-                {isAdmin && (
-                    <div className="card announcement-form-container">
-                        {!showForm ? (
-                            <button className="btn-secondary" onClick={() => setShowForm(true)}>+ Create New Announcement</button>
-                        ) : (
-                             <form onSubmit={handleSubmit}>
-                                <h3>New Announcement</h3>
-                                <div className="form-group"><label htmlFor="title">Title</label><input type="text" id="title" name="title" value={formData.title} onChange={handleChange} required /></div>
-                                <div className="form-group"><label htmlFor="excerpt">Content</label><textarea id="excerpt" name="excerpt" value={formData.excerpt} rows="4" onChange={handleChange} required></textarea></div>
-                                <div className="form-actions">
-                                    <button type="button" className="btn-tertiary" onClick={() => setShowForm(false)}>Cancel</button>
-                                    <button type="submit" className="btn-generate">Post</button>
-                                </div>
-                            </form>
-                        )}
-                    </div>
-                )}
-
-                {announcements.length > 0 ? (
-                    <div className="card-grid">
-                        {announcements.map((item) => (
-                            <div className="card" key={item.id}>
-                                <h3>{item.title}</h3>
-                                <p className="date">{item.date}</p>
-                                <p>{item.excerpt}</p>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="empty-state">
-                        <p>No announcements have been posted yet.</p>
-                    </div>
-                )}
-            </div>
+            ) : <div className="empty-state"><p>No announcements have been posted yet.</p></div>}
         </div>
     );
 };
 
-const FacultyPage = ({ faculty, currentUser, onAddFaculty }) => {
-    const [showForm, setShowForm] = useState(false);
-    const [formData, setFormData] = useState({ name: '', title: '', area: '' });
+// --- NEWLY IMPLEMENTED PAGE COMPONENTS ---
 
-    const isAdmin = currentUser.role === 'Class President' || currentUser.role === 'Admin';
-
-    const handleChange = (e) => {
-        setFormData({...formData, [e.target.name]: e.target.value});
-    };
-
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        if (formData.name.trim() && formData.title.trim() && formData.area.trim()) {
-            onAddFaculty(formData);
-            setFormData({ name: '', title: '', area: '' });
-            setShowForm(false);
-        }
-    };
-
+const CoursesPage = () => {
     return (
-        <div className="page-container">
-            <div className="container">
-                <h1 className="page-title">Our Faculty</h1>
-                <p className="page-subtitle">Meet the talented team shaping the future of economics.</p>
-                
-                {isAdmin && (
-                    <div className="card announcement-form-container">
-                        {!showForm ? (
-                            <button className="btn-secondary" onClick={() => setShowForm(true)}>+ Add New Faculty</button>
-                        ) : (
-                            <form onSubmit={handleSubmit}>
-                                <h3>New Faculty Profile</h3>
-                                <div className="form-group"><label htmlFor="name">Full Name</label><input type="text" id="name" name="name" value={formData.name} onChange={handleChange} required /></div>
-                                <div className="form-group"><label htmlFor="title">Title</label><input type="text" id="title" name="title" value={formData.title} onChange={handleChange} required /></div>
-                                <div className="form-group"><label htmlFor="area">Area of Specialization</label><input type="text" id="area" name="area" value={formData.area} onChange={handleChange} required /></div>
-                                <div className="form-actions">
-                                    <button type="button" className="btn-tertiary" onClick={() => setShowForm(false)}>Cancel</button>
-                                    <button type="submit" className="btn-generate">Add Faculty</button>
-                                </div>
-                            </form>
-                        )}
-                    </div>
-                )}
-                
-                {faculty.length > 0 ? (
-                    <div className="card-grid">
-                        {faculty.map((person, index) => (
-                            <div className="card faculty-card" key={person.id || index}>
-                                <div className="faculty-avatar"></div>
-                                <h3>{person.name}</h3>
-                                <p className="title">{person.title}</p>
-                                <p className="area">{person.area}</p>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="empty-state">
-                         <p>No faculty profiles have been added yet.</p>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-};
-
-
-const CoursesPage = ({ courses, currentUser, onCourseUpdate }) => {
-    const isAdmin = currentUser.role === 'Class President' || currentUser.role === 'Admin';
-    const [editingCourseId, setEditingCourseId] = useState(null);
-    const [courseData, setCourseData] = useState({ code: '', title: '', units: '' });
-    const [activeLevel, setActiveLevel] = useState(Object.keys(courses)[0]);
-
-    const handleEdit = (course) => {
-        setEditingCourseId(course.id);
-        setCourseData({ code: course.code, title: course.title, units: course.units });
-    };
-
-    const handleCancel = () => {
-        setEditingCourseId(null);
-    };
-
-    const handleSave = (level, semester, courseId) => {
-        onCourseUpdate(level, semester, courseId, courseData);
-        setEditingCourseId(null);
-    };
-    
-    const handleChange = (e) => {
-        setCourseData({...courseData, [e.target.name]: e.target.value });
-    }
-    
-    const levelSemesters = courses[activeLevel] || {};
-
-    return (
-        <div className="page-container">
-            <div className="container">
-                <h1 className="page-title">Course Catalog</h1>
-                <p className="page-subtitle">Department of Economics – Full Course List (100–400 Level)</p>
-                <div className="courses-content">
-                    <div className="course-level-tabs">
-                        {Object.keys(courses).map(level => (
-                            <button 
-                                key={level} 
-                                className={`level-tab ${activeLevel === level ? 'active' : ''}`}
-                                onClick={() => setActiveLevel(level)}
-                            >
-                                {level}
-                            </button>
-                        ))}
-                    </div>
-                    
-                    <section className="course-level-section">
-                        <div className="course-semesters-grid">
-                            {Object.entries(levelSemesters).map(([semester, semesterCourses]) => (
-                                <div key={semester} className="course-semester-section">
-                                    <h3 className="course-semester-title">{semester}</h3>
-                                    <ul className="course-list">
-                                        {Array.isArray(semesterCourses) && semesterCourses.map(course => (
-                                            <li key={course.id} className="course-item">
-                                                {editingCourseId === course.id ? (
-                                                    <div className="course-edit-form">
-                                                        <input type="text" name="code" value={courseData.code} onChange={handleChange} placeholder="Code"/>
-                                                        <input type="text" name="title" value={courseData.title} onChange={handleChange} placeholder="Title"/>
-                                                        <input type="text" name="units" value={courseData.units} onChange={handleChange} placeholder="Units"/>
-                                                        <div className="course-edit-actions">
-                                                            <button onClick={() => handleSave(activeLevel, semester, course.id)}>Save</button>
-                                                            <button onClick={handleCancel}>Cancel</button>
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <>
-                                                        <span className="course-code">{course.code}</span>
-                                                        <span className="course-title">{course.title}</span>
-                                                        <span className="course-units">{course.units}</span>
-                                                        {isAdmin && <button className="btn-edit" onClick={() => handleEdit(course)}>Edit</button>}
-                                                    </>
-                                                )}
-                                            </li>
+        <div>
+            <h1 className="page-title">Courses</h1>
+            <p className="page-subtitle">Official course listings for the Economics program.</p>
+            <div className="courses-grid">
+                {Object.entries(INITIAL_COURSES_DATA).map(([level, semesters]) => (
+                    <div key={level}>
+                        <h2>{level}</h2>
+                        {Object.entries(semesters).map(([semester, courses]) => (
+                            <div className="card" key={semester} style={{marginBottom: '2rem'}}>
+                                <h3>{semester}</h3>
+                                <table className="course-list-table">
+                                    <thead>
+                                        <tr><th>Code</th><th>Title</th><th>Units</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        {courses.map(course => (
+                                            <tr key={course.id}>
+                                                <td>{course.code}</td>
+                                                <td>{course.title}</td>
+                                                <td>{course.units}</td>
+                                            </tr>
                                         ))}
-                                    </ul>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
-                </div>
+                                    </tbody>
+                                </table>
+                            </div>
+                        ))}
+                    </div>
+                ))}
             </div>
         </div>
     );
 };
 
-const DocumentsPage = ({ documents, currentUser, onAddDocument }) => {
-    const [isDragging, setIsDragging] = useState(false);
-    const [customName, setCustomName] = useState('');
-    const [file, setFile] = useState(null);
+interface CoursePlannerPageProps {
+    currentUser: CurrentUser;
+    coursePlans: CoursePlan[];
+    onUpdateCoursePlan: (semester: string, courseCodes: string[]) => void;
+}
+const CoursePlannerPage = ({ currentUser, coursePlans, onUpdateCoursePlan }: CoursePlannerPageProps) => {
+    const [selectedSemester, setSelectedSemester] = useState('100 Level Harmattan Semester');
     
-    const isAdmin = currentUser.role === 'Class President' || currentUser.role === 'Admin';
-
-    const handleFileSelect = (selectedFile) => {
-        if (selectedFile) {
-            setFile(selectedFile);
-            if (!customName) {
-                setCustomName(selectedFile.name.replace(/\.[^/.]+$/, ""));
-            }
-        }
+    const allSemesters = Object.entries(INITIAL_COURSES_DATA).flatMap(([level, semesters]) => 
+        Object.keys(semesters).map(semester => `${level} ${semester}`)
+    );
+    
+    const coursesForSemester = (level: string, semester: string): Course[] => {
+        return INITIAL_COURSES_DATA[level]?.[semester] || [];
     };
     
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        if(file) {
-            onAddDocument({ file, customName });
-            setFile(null);
-            setCustomName('');
-        } else {
-            alert("Please select a file first.");
-        }
-    }
-
-    const handleDragEvents = (e, dragging) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsDragging(dragging);
+    const [level, semesterName] = selectedSemester.split(/ (Harmattan|Rain) /);
+    const availableCourses = coursesForSemester(level, `${semesterName} Semester`);
+    
+    const currentPlan = coursePlans.find(p => p.userId === currentUser.id && p.semester === selectedSemester) || { courseCodes: [] };
+    
+    const handleToggleCourse = (courseCode: string) => {
+        const newCourseCodes = currentPlan.courseCodes.includes(courseCode)
+            ? currentPlan.courseCodes.filter(c => c !== courseCode)
+            : [...currentPlan.courseCodes, courseCode];
+        onUpdateCoursePlan(selectedSemester, newCourseCodes);
     };
 
-    const handleDrop = (e) => {
-        handleDragEvents(e, false);
-        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-            handleFileSelect(e.dataTransfer.files[0]);
-        }
-    };
-    
-    const handleView = (doc) => {
-        const newWindow = window.open();
-        newWindow.document.write(`<iframe src="${doc.data}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
-        newWindow.document.title = doc.name;
-    }
-    
+    const plannedCourses = availableCourses.filter(c => currentPlan.courseCodes.includes(c.code));
+    const totalUnits = plannedCourses.reduce((acc, course) => acc + parseInt(course.units), 0);
+
     return (
-        <div className="page-container">
-            <div className="container">
-                <h1 className="page-title">Documents</h1>
-                <p className="page-subtitle">Shared resources and documents for the class.</p>
-                
-                {isAdmin && (
-                    <div className="card admin-card">
-                        <h3>Upload New Document</h3>
-                        <form onSubmit={handleSubmit} className="document-upload-form">
-                             <div 
-                                className={`upload-area ${isDragging ? 'dragging' : ''}`}
-                                onDragEnter={(e) => handleDragEvents(e, true)}
-                                onDragLeave={(e) => handleDragEvents(e, false)}
-                                onDragOver={(e) => handleDragEvents(e, true)}
-                                onDrop={handleDrop}
-                            >
-                                <input type="file" id="file-upload" onChange={(e) => handleFileSelect(e.target.files[0])} className="upload-input" />
-                                <label htmlFor="file-upload" className="upload-label">
-                                    {file ? <p>Selected: {file.name}</p> : <p>Drag & Drop a file here</p>}
-                                    <p>or</p>
-                                    <span className="btn-tertiary">Browse Files</span>
-                                </label>
-                            </div>
-                            <div className="form-group">
-                                <label htmlFor="customName">Document Name</label>
-                                <input type="text" id="customName" value={customName} onChange={(e) => setCustomName(e.target.value)} placeholder="Enter a name for the document" required/>
-                            </div>
-                            <button type="submit" className="btn-secondary">Upload</button>
-                        </form>
-                    </div>
-                )}
-                
+        <div>
+            <h1 className="page-title">Course Planner</h1>
+            <p className="page-subtitle">Select your courses for each semester to plan your academic journey.</p>
+            <div className="course-planner-grid">
                 <div className="card">
-                    <h3>Available Documents</h3>
-                    {documents.length > 0 ? (
-                        <ul className="document-list">
-                            {documents.map(doc => (
-                                <li key={doc.id} className="document-item">
-                                    <span className="document-name">{doc.name}</span>
-                                    <div className="document-actions">
-                                      <button onClick={() => handleView(doc)} className="btn-view">View</button>
-                                      <a href={doc.data} download={doc.name} className="btn-download">Download</a>
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
-                    ) : (
-                        <p>No documents have been uploaded yet.</p>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const QuizzesPage = ({ quizzes, currentUser, setRoute, onDeleteQuiz }) => {
-    const isAdmin = currentUser.role === 'Class President' || currentUser.role === 'Admin';
-    return (
-        <div className="page-container">
-            <div className="container">
-                <h1 className="page-title">Quizzes</h1>
-                <p className="page-subtitle">Test your knowledge with these quizzes.</p>
-                {isAdmin && (
-                    <div className="admin-actions">
-                        <button className="btn-secondary" onClick={() => setRoute({ page: 'createQuiz' })}>+ Create New Quiz</button>
-                    </div>
-                )}
-                <div className="quiz-list">
-                    {quizzes.length > 0 ? (
-                        quizzes.map(quiz => (
-                            <div className="card quiz-card" key={quiz.id}>
-                                <div className="quiz-info">
-                                    <h3>{quiz.title}</h3>
-                                    <p>{quiz.questions.length} Questions | Type: {quiz.type.toUpperCase()}</p>
-                                </div>
-                                <div className="quiz-actions">
-                                    <button className="btn-primary" onClick={() => setRoute({ page: 'takeQuiz', quizId: quiz.id })}>Take Quiz</button>
-                                    {isAdmin && <button className="btn-danger" onClick={() => onDeleteQuiz(quiz.id)}>Delete</button>}
-                                </div>
-                            </div>
-                        ))
-                    ) : (
-                         <div className="empty-state">
-                            <p>No quizzes are available at the moment.</p>
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
-    )
-};
-
-const CreateQuizPage = ({ setRoute, onCreateQuiz }) => {
-    const [title, setTitle] = useState('');
-    const [type, setType] = useState('mcq');
-    const [questions, setQuestions] = useState([{ text: '', image: null, options: ['', '', '', ''], correctAnswerIndex: 0, modelAnswer: '' }]);
-
-    // AI Generator State
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [aiTopic, setAiTopic] = useState('');
-    const [aiNumQuestions, setAiNumQuestions] = useState(5);
-    const [aiError, setAiError] = useState('');
-
-    const handleGenerateQuestions = async () => {
-        if (!aiTopic.trim()) {
-            setAiError('Please enter a topic.');
-            return;
-        }
-         if (type !== 'mcq') {
-            setAiError('AI generation is only available for Multiple Choice quizzes for now.');
-            return;
-        }
-        setIsGenerating(true);
-        setAiError('');
-
-        try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-            
-            const schema = {
-                type: Type.ARRAY,
-                items: {
-                    type: Type.OBJECT,
-                    properties: {
-                        questionText: {
-                            type: Type.STRING,
-                            description: "The text of the multiple-choice question."
-                        },
-                        options: {
-                            type: Type.ARRAY,
-                            items: { type: Type.STRING },
-                            description: "An array of 4 possible answers."
-                        },
-                        correctAnswerIndex: {
-                            type: Type.INTEGER,
-                            description: "The 0-based index of the correct answer in the options array."
-                        }
-                    },
-                    required: ["questionText", "options", "correctAnswerIndex"]
-                }
-            };
-
-            const prompt = `Generate ${aiNumQuestions} multiple-choice questions about "${aiTopic}". The questions should be suitable for university-level economics students. Ensure each question has exactly 4 options.`;
-
-            const response = await ai.models.generateContent({
-                model: "gemini-2.5-flash",
-                contents: prompt,
-                config: {
-                    responseMimeType: "application/json",
-                    responseSchema: schema
-                }
-            });
-
-            const generatedData = JSON.parse(response.text);
-
-            if (Array.isArray(generatedData)) {
-                const newQuestions = generatedData.map(q => ({
-                    text: q.questionText || 'Missing question text',
-                    image: null,
-                    options: (Array.isArray(q.options) && q.options.length > 0)
-                        ? [...q.options.slice(0, 4), ...Array(Math.max(0, 4 - q.options.length)).fill('')]
-                        : ['', '', '', ''],
-                    correctAnswerIndex: (typeof q.correctAnswerIndex === 'number' && q.correctAnswerIndex >= 0 && q.correctAnswerIndex < 4) ? q.correctAnswerIndex : 0,
-                    modelAnswer: ''
-                }));
-                setQuestions(newQuestions);
-            } else {
-                throw new Error("AI response was not in the expected format (expected an array).");
-            }
-
-        } catch (error) {
-            console.error("Error generating questions:", error);
-            setAiError("Sorry, something went wrong while generating questions. Please try again or check the console for details.");
-        } finally {
-            setIsGenerating(false);
-        }
-    };
-
-    const handleQuestionChange = (index, field, value) => {
-        const newQuestions = [...questions];
-        newQuestions[index][field] = value;
-        setQuestions(newQuestions);
-    };
-
-    const handleOptionChange = (qIndex, oIndex, value) => {
-        const newQuestions = [...questions];
-        newQuestions[qIndex].options[oIndex] = value;
-        setQuestions(newQuestions);
-    };
-    
-    const handleCorrectAnswerChange = (qIndex, oIndex) => {
-        const newQuestions = [...questions];
-        newQuestions[qIndex].correctAnswerIndex = oIndex;
-        setQuestions(newQuestions);
-    };
-
-    const handleImageChange = (index, file) => {
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                handleQuestionChange(index, 'image', e.target.result);
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    const addQuestion = () => {
-        if (type === 'mcq') {
-            setQuestions([...questions, { text: '', image: null, options: ['', '', '', ''], correctAnswerIndex: 0, modelAnswer: '' }]);
-        } else {
-            setQuestions([...questions, { text: '', image: null, modelAnswer: '' }]);
-        }
-    };
-    
-    const removeQuestion = (index) => {
-        const newQuestions = questions.filter((_, i) => i !== index);
-        setQuestions(newQuestions);
-    }
-    
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        const finalQuiz = { title, type, questions };
-        onCreateQuiz(finalQuiz);
-    }
-
-    return (
-        <div className="page-container">
-            <div className="container">
-                <h1 className="page-title">Create a New Quiz</h1>
-                <form className="card create-quiz-form" onSubmit={handleSubmit}>
+                    <h3>Select Semester</h3>
                     <div className="form-group">
-                        <label>Quiz Title</label>
-                        <input type="text" value={title} onChange={e => setTitle(e.target.value)} required />
-                    </div>
-                    <div className="form-group">
-                        <label>Quiz Type</label>
-                        <select value={type} onChange={e => { setType(e.target.value); setQuestions([{ text: '', image: null, options: ['', '', '', ''], correctAnswerIndex: 0, modelAnswer: '' }])}}>
-                            <option value="mcq">Multiple Choice</option>
-                            <option value="theory">Theory</option>
+                        <select value={selectedSemester} onChange={e => setSelectedSemester(e.target.value)}>
+                            {allSemesters.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                     </div>
-
-                    {type === 'mcq' && (
-                        <div className="card ai-generator-card">
-                            <h3>Generate Questions with AI</h3>
-                            <p className="page-subtitle" style={{textAlign: 'left', margin: '0 0 1.5rem 0', fontSize: '1rem', color: '#6B7280'}}>Save time by generating quiz questions automatically.</p>
-                            {aiError && <p className="error-message">{aiError}</p>}
-                            <div className="form-group">
-                                <label>Topic</label>
-                                <input type="text" value={aiTopic} onChange={e => setAiTopic(e.target.value)} placeholder="e.g., Principles of Microeconomics" />
-                            </div>
-                            <div className="form-group">
-                                <label>Number of Questions</label>
-                                <input type="number" value={aiNumQuestions} onChange={e => setAiNumQuestions(parseInt(e.target.value, 10))} min="1" max="10" />
-                            </div>
-                            <button type="button" className="btn-generate" onClick={handleGenerateQuestions} disabled={isGenerating}>
-                                {isGenerating ? 'Generating...' : 'Generate Questions'}
-                            </button>
-                        </div>
-                    )}
-                    
-                    <hr/>
-                    {questions.map((q, qIndex) => (
-                        <div key={qIndex} className="question-editor">
-                            <h4>Question {qIndex + 1}</h4>
-                            <textarea placeholder="Enter question text..." value={q.text} onChange={e => handleQuestionChange(qIndex, 'text', e.target.value)} required></textarea>
-                            <div className="form-group">
-                                <label>Optional Image</label>
-                                <input type="file" accept="image/*" onChange={e => handleImageChange(qIndex, e.target.files[0])} />
-                                {q.image && <img src={q.image} alt="Question preview" className="quiz-image-preview" />}
-                            </div>
-                            {type === 'mcq' && (
-                                <div className="options-editor">
-                                    <label>Options (select the correct answer)</label>
-                                    {q.options.map((opt, oIndex) => (
-                                        <div key={oIndex} className="option-input">
-                                            <input type="radio" name={`correct_q${qIndex}`} checked={q.correctAnswerIndex === oIndex} onChange={() => handleCorrectAnswerChange(qIndex, oIndex)}/>
-                                            <input type="text" placeholder={`Option ${oIndex + 1}`} value={opt} onChange={e => handleOptionChange(qIndex, oIndex, e.target.value)} required/>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                             {type === 'theory' && (
-                                <div className="form-group">
-                                    <label>Model Answer</label>
-                                    <textarea placeholder="Enter the model answer..." value={q.modelAnswer} onChange={e => handleQuestionChange(qIndex, 'modelAnswer', e.target.value)} required></textarea>
-                                </div>
-                            )}
-                             <button type="button" className="btn-danger-text" onClick={() => removeQuestion(qIndex)}>Remove Question</button>
-                        </div>
-                    ))}
-                    <div className="quiz-form-actions">
-                       <button type="button" className="btn-tertiary" onClick={addQuestion}>+ Add Question</button>
-                       <div>
-                           <button type="button" className="btn-tertiary" onClick={() => setRoute({ page: 'quizzes' })}>Cancel</button>
-                           <button type="submit" className="btn-secondary">Create Quiz</button>
-                       </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-    );
-};
-
-
-const TakeQuizPage = ({ quiz, onSubmit, currentUser }) => {
-    const [answers, setAnswers] = useState({});
-
-    const handleAnswerChange = (questionIndex, answer) => {
-        setAnswers(prev => ({ ...prev, [questionIndex]: answer }));
-    };
-
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        onSubmit(quiz.id, answers, currentUser.id);
-    };
-
-    return (
-        <div className="page-container">
-            <div className="container">
-                <h1 className="page-title">{quiz.title}</h1>
-                <form className="card take-quiz-form" onSubmit={handleSubmit}>
-                    {quiz.questions.map((q, qIndex) => (
-                        <div key={qIndex} className="quiz-question-block">
-                            <p className="question-text">{qIndex + 1}. {q.text}</p>
-                            {q.image && <img src={q.image} alt="Question" className="quiz-image-display" />}
-                            {quiz.type === 'mcq' ? (
-                                <div className="quiz-options">
-                                    {q.options.map((opt, oIndex) => (
-                                        <label key={oIndex} className="quiz-option-label">
-                                            <input
-                                                type="radio"
-                                                name={`q_${qIndex}`}
-                                                value={oIndex}
-                                                onChange={() => handleAnswerChange(qIndex, oIndex)}
-                                                checked={answers[qIndex] === oIndex}
-                                                required
-                                            />
-                                            {opt}
-                                        </label>
-                                    ))}
-                                </div>
-                            ) : (
-                                <textarea
-                                    className="quiz-theory-answer"
-                                    placeholder="Your answer..."
-                                    onChange={(e) => handleAnswerChange(qIndex, e.target.value)}
-                                    value={answers[qIndex] || ''}
-                                    required
-                                ></textarea>
-                            )}
-                        </div>
-                    ))}
-                    <button type="submit" className="btn-primary">Submit Quiz</button>
-                </form>
-            </div>
-        </div>
-    );
-};
-
-const QuizResultsPage = ({ quiz, submission, setRoute }) => {
-    let score = 0;
-    if (quiz.type === 'mcq') {
-        quiz.questions.forEach((q, index) => {
-            if (submission.answers[index] === q.correctAnswerIndex) {
-                score++;
-            }
-        });
-    }
-
-    return (
-        <div className="page-container">
-            <div className="container">
-                <h1 className="page-title">Quiz Results: {quiz.title}</h1>
-                {quiz.type === 'mcq' && (
-                    <div className="card score-card">
-                        <h2>Your Score: {score} / {quiz.questions.length}</h2>
-                    </div>
-                )}
-                <div className="card results-breakdown">
-                    <h3>Review Your Answers</h3>
-                    {quiz.questions.map((q, qIndex) => (
-                        <div key={qIndex} className="result-question-block">
-                            <p className="question-text">{qIndex + 1}. {q.text}</p>
-                             {q.image && <img src={q.image} alt="Question" className="quiz-image-display" />}
-                            {quiz.type === 'mcq' ? (
-                                <div className="result-options">
-                                    {q.options.map((opt, oIndex) => {
-                                        const isCorrect = oIndex === q.correctAnswerIndex;
-                                        const isUserAnswer = submission.answers[qIndex] === oIndex;
-                                        let className = 'result-option';
-                                        if (isCorrect) className += ' correct';
-                                        if (isUserAnswer && !isCorrect) className += ' incorrect';
-                                        
-                                        return (
-                                            <div key={oIndex} className={className}>
-                                                {isUserAnswer && <span className="your-answer-indicator">{isCorrect ? '✔' : '✖'}</span>}
-                                                {opt}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            ) : (
-                                <div className="theory-result">
-                                    <h4>Your Answer:</h4>
-                                    <p className="user-answer-text">{submission.answers[qIndex]}</p>
-                                    <h4>Model Answer:</h4>
-                                    <p className="model-answer-text">{q.modelAnswer}</p>
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </div>
-                 <div className="view-all-wrapper">
-                    <button onClick={() => setRoute({page: 'quizzes'})} className="btn-secondary">Back to Quizzes</button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const MembersPage = ({ users, currentUser, setRoute }) => {
-    return (
-        <div className="page-container">
-            <div className="container">
-                <h1 className="page-title">Class Members</h1>
-                <p className="page-subtitle">Connect with your classmates in the Department of Economics.</p>
-                 <div className="card-grid">
-                    {users.map(user => (
-                        <div key={user.id} className="card member-card">
-                            <img src={user.profilePicture || `https://api.dicebear.com/7.x/initials/svg?seed=${user.fullName}`} alt={user.fullName} className="member-avatar" />
-                            <div className="member-info">
-                                <h3>{user.fullName}</h3>
-                                <p>@{user.username}</p>
-                                <span className={`role-badge ${user.role.toLowerCase().replace(/[\s_]/g, '-')}`}>{user.role}</span>
-                            </div>
-                            {user.id !== currentUser.id && (
-                                <button className="btn-secondary btn-message" onClick={() => setRoute({ page: 'chat', withUserId: user.id })}>
-                                    Message
-                                </button>
-                            )}
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const MessagesPage = ({ messages, users, currentUser, setRoute, groups }) => {
-    // 1. Process Direct Messages
-    const dmConversations = Object.values(messages.reduce((acc, msg) => {
-        if (msg.groupId) return acc; // Skip group messages
-        const otherUserId = msg.from === currentUser.id ? msg.to : msg.from;
-        if (!otherUserId) return acc;
-        
-        if (!acc[otherUserId] || acc[otherUserId].lastMessage.timestamp < msg.timestamp) {
-            const otherUser = users.find(u => u.id === otherUserId);
-            if (otherUser) {
-                acc[otherUserId] = {
-                    user: otherUser,
-                    lastMessage: msg,
-                };
-            }
-        }
-        return acc;
-    }, {}));
-
-    // 2. Process Group Chats
-    const userGroups = groups.filter(g => g.members.includes(currentUser.id));
-    const groupConversations = userGroups.map(group => {
-        const lastMessage = messages
-            .filter(msg => msg.groupId === group.id)
-            .sort((a, b) => b.timestamp - a.timestamp)[0];
-        
-        return {
-            group,
-            lastMessage: lastMessage || { text: 'No messages yet', timestamp: group.id } // Use group ID for timestamp if no messages
-        };
-    });
-
-    // 3. Combine and Sort
-    const allConversations = [
-        ...dmConversations.map(c => ({ ...c, type: 'dm' })),
-        ...groupConversations.map(c => ({ ...c, type: 'group' }))
-    ].sort((a, b) => b.lastMessage.timestamp - a.lastMessage.timestamp);
-
-    const formatTime = (timestamp) => {
-        if (typeof timestamp !== 'number' || timestamp === 0) return '';
-        const date = new Date(timestamp);
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
-
-    return (
-        <div className="page-container">
-            <div className="container">
-                <div className="page-header-with-action">
-                    <div>
-                        <h1 className="page-title">Messages</h1>
-                        <p className="page-subtitle">Your recent conversations.</p>
-                    </div>
-                    <button className="btn-secondary" onClick={() => setRoute({ page: 'createGroup' })}>+ Create Group</button>
+                    <h4>Available Courses for {selectedSemester}</h4>
+                    <table className="course-list-table">
+                        <thead>
+                            <tr><th></th><th>Code</th><th>Title</th><th>Units</th></tr>
+                        </thead>
+                        <tbody>
+                            {availableCourses.map(course => (
+                                <tr key={course.id}>
+                                    <td><input type="checkbox" checked={currentPlan.courseCodes.includes(course.code)} onChange={() => handleToggleCourse(course.code)} /></td>
+                                    <td>{course.code}</td>
+                                    <td>{course.title}</td>
+                                    <td>{course.units}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
                 <div className="card">
-                    {allConversations.length > 0 ? (
-                        <ul className="conversations-list">
-                            {allConversations.map((convo) => {
-                                const key = convo.type === 'dm' ? convo.user.id : convo.group.id;
-                                const lastMessageText = convo.lastMessage.text || 'No messages yet';
-                                const senderPrefix = convo.lastMessage.from === currentUser.id ? 'You: ' : '';
-
-                                return (
-                                    <li 
-                                        key={key} 
-                                        className="conversation-item" 
-                                        onClick={() => setRoute(convo.type === 'dm' 
-                                            ? { page: 'chat', withUserId: convo.user.id }
-                                            : { page: 'chat', withGroupId: convo.group.id })}
-                                    >
-                                        {convo.type === 'dm' ? (
-                                            <img src={convo.user.profilePicture || `https://api.dicebear.com/7.x/initials/svg?seed=${convo.user.fullName}`} alt={convo.user.fullName} className="convo-avatar" />
-                                        ) : (
-                                            <div className="convo-avatar group-avatar">
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
-                                            </div>
-                                        )}
-                                        <div className="convo-details">
-                                            <h4>{convo.type === 'dm' ? convo.user.fullName : convo.group.name}</h4>
-                                            <p className="last-message-preview">
-                                                {senderPrefix}{lastMessageText.substring(0, 40)}{lastMessageText.length > 40 ? '...' : ''}
-                                            </p>
-                                        </div>
-                                        <span className="convo-time">{formatTime(convo.lastMessage.timestamp)}</span>
-                                    </li>
-                                );
-                            })}
-                        </ul>
+                    <h3>Your Plan for {selectedSemester}</h3>
+                    {plannedCourses.length > 0 ? (
+                        <>
+                            {plannedCourses.map(course => (
+                                <div className="planned-course" key={course.id}>
+                                    <span><strong>{course.code}</strong> - {course.title} ({course.units} units)</span>
+                                    <button className="btn-danger btn-sm" onClick={() => handleToggleCourse(course.code)}>Remove</button>
+                                </div>
+                            ))}
+                            <hr />
+                            <div style={{textAlign: 'right'}}>
+                                <h4>Total Units: {totalUnits}</h4>
+                            </div>
+                        </>
                     ) : (
-                        <div className="empty-state">
-                            <p>You have no messages yet. Start a conversation from the Members page or create a group.</p>
-                        </div>
+                        <p>No courses selected for this semester.</p>
                     )}
                 </div>
             </div>
@@ -1221,560 +865,1928 @@ const MessagesPage = ({ messages, users, currentUser, setRoute, groups }) => {
     );
 };
 
-const CreateGroupPage = ({ users, currentUser, onCreateGroup, setRoute }) => {
-    const [name, setName] = useState('');
-    const [selectedMembers, setSelectedMembers] = useState({});
-
-    const handleMemberToggle = (userId) => {
-        setSelectedMembers(prev => ({
-            ...prev,
-            [userId]: !prev[userId]
-        }));
-    };
-
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        const memberIds = Object.keys(selectedMembers).filter(id => selectedMembers[id]);
-        if (name.trim() && memberIds.length > 0) {
-            onCreateGroup({
-                name: name.trim(),
-                memberIds: [...memberIds.map(id => parseInt(id)), currentUser.id] // Creator is always a member
-            });
-        } else {
-            alert('Please provide a group name and select at least one member.');
-        }
-    };
-    
+interface FacultyDirectoryPageProps {
+    faculty: Faculty[];
+}
+const FacultyDirectoryPage = ({ faculty }: FacultyDirectoryPageProps) => {
     return (
-        <div className="page-container">
-            <div className="container">
-                <h1 className="page-title">Create a New Group</h1>
-                <p className="page-subtitle">Start a conversation with multiple classmates.</p>
-                <form className="card create-group-form" onSubmit={handleSubmit}>
-                    <div className="form-group">
-                        <label htmlFor="group-name">Group Name</label>
-                        <input type="text" id="group-name" value={name} onChange={e => setName(e.target.value)} required />
+        <div>
+            <h1 className="page-title">Faculty Directory</h1>
+            <p className="page-subtitle">Meet the esteemed faculty of the Economics department.</p>
+            <div className="directory-grid">
+                {faculty.map(member => (
+                    <div className="card faculty-card" key={member.id}>
+                        <img src={member.profilePicture} alt={member.name} />
+                        <h4>{member.name}</h4>
+                        <p>{member.title}</p>
+                        <p><a href={`mailto:${member.email}`}>{member.email}</a></p>
+                        <p>Office: {member.office}</p>
                     </div>
-                     <div className="form-group">
-                        <label>Select Members</label>
-                        <ul className="member-selection-list">
-                            {users.filter(u => u.id !== currentUser.id).map(user => (
-                                <li key={user.id} className="member-selection-item">
-                                    <input 
-                                        type="checkbox" 
-                                        id={`member-${user.id}`} 
-                                        checked={!!selectedMembers[user.id]}
-                                        onChange={() => handleMemberToggle(user.id)}
-                                    />
-                                    <label htmlFor={`member-${user.id}`}>
-                                        <img src={user.profilePicture || `https://api.dicebear.com/7.x/initials/svg?seed=${user.fullName}`} alt={user.fullName} />
-                                        <span>{user.fullName}</span>
-                                    </label>
-                                </li>
-                            ))}
-                        </ul>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+interface AssignmentsPageProps {
+    assignments: Assignment[];
+    currentUser: CurrentUser;
+    onAddAssignment: (data: Omit<Assignment, 'id'>) => void;
+}
+const AssignmentsPage = ({ assignments, currentUser, onAddAssignment }: AssignmentsPageProps) => {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [formData, setFormData] = useState({ title: '', description: '', dueDate: '', courseCode: '' });
+    const isAdmin = currentUser.role === 'Class President' || currentUser.role === 'Admin';
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onAddAssignment(formData);
+        setIsModalOpen(false);
+        setFormData({ title: '', description: '', dueDate: '', courseCode: '' });
+    };
+
+    const groupedAssignments = assignments.reduce((acc, item) => {
+        (acc[item.courseCode] = acc[item.courseCode] || []).push(item);
+        return acc;
+    }, {} as Record<string, Assignment[]>);
+
+    return (
+        <div>
+            <div className="page-header-with-action">
+                <div>
+                    <h1 className="page-title">Assignments</h1>
+                    <p className="page-subtitle">View upcoming and past assignments for your courses.</p>
+                </div>
+                {isAdmin && <button className="btn-primary" onClick={() => setIsModalOpen(true)}>+ New Assignment</button>}
+            </div>
+
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Create New Assignment">
+                <form onSubmit={handleSubmit}>
+                    <div className="form-group"><label>Title</label><input type="text" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} required /></div>
+                    <div className="form-group"><label>Course Code</label>
+                        <select value={formData.courseCode} onChange={e => setFormData({ ...formData, courseCode: e.target.value })} required>
+                            <option value="">Select a course</option>
+                            {ALL_COURSE_CODES.map(code => <option key={code} value={code}>{code}</option>)}
+                        </select>
                     </div>
+                    <div className="form-group"><label>Due Date</label><input type="date" value={formData.dueDate} onChange={e => setFormData({ ...formData, dueDate: e.target.value })} required /></div>
+                    <div className="form-group"><label>Description</label><textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} required></textarea></div>
                     <div className="form-actions">
-                        <button type="button" className="btn-tertiary" onClick={() => setRoute({ page: 'messages' })}>Cancel</button>
-                        <button type="submit" className="btn-secondary">Create Group</button>
+                        <button type="button" className="btn-tertiary" onClick={() => setIsModalOpen(false)}>Cancel</button>
+                        <button type="submit" className="btn-secondary">Post Assignment</button>
                     </div>
                 </form>
-            </div>
-        </div>
-    );
-};
+            </Modal>
 
-
-const ChatPage = ({ messages, users, currentUser, withUserId, withGroupId, onSendMessage, setRoute, groups }) => {
-    const isGroupChat = !!withGroupId;
-    const otherUser = !isGroupChat ? users.find(u => u.id === withUserId) : null;
-    const group = isGroupChat ? groups.find(g => g.id === withGroupId) : null;
-
-    const [newMessage, setNewMessage] = useState('');
-    const chatBodyRef = useRef(null);
-    const textareaRef = useRef(null);
-
-    const chatTarget = isGroupChat ? group : otherUser;
-
-    const chatMessages = messages
-        .filter(msg => {
-            if (isGroupChat) {
-                return msg.groupId === withGroupId;
-            }
-            return (msg.from === currentUser.id && msg.to === withUserId) || (msg.from === withUserId && msg.to === currentUser.id);
-        })
-        .sort((a, b) => a.timestamp - b.timestamp);
-    
-    useEffect(() => {
-        if(chatBodyRef.current) {
-            chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
-        }
-    }, [chatMessages]);
-
-    useEffect(() => {
-        if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto';
-            const scrollHeight = textareaRef.current.scrollHeight;
-            textareaRef.current.style.height = `${scrollHeight}px`;
-        }
-    }, [newMessage]);
-
-    if (!chatTarget) {
-        setRoute({ page: 'messages' });
-        return null; 
-    }
-    
-    const handleSend = (e) => {
-        e.preventDefault();
-        if (newMessage.trim()) {
-            onSendMessage({
-                text: newMessage.trim(),
-                toUserId: isGroupChat ? undefined : withUserId,
-                groupId: isGroupChat ? withGroupId : undefined,
-            });
-            setNewMessage('');
-        }
-    };
-
-    const handleKeyDown = (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleSend(e);
-        }
-    };
-
-    const formatTime = (timestamp) => {
-        const date = new Date(timestamp);
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    };
-
-    const findSender = (userId) => users.find(u => u.id === userId);
-
-    return (
-        <div className="page-container chat-page">
-            <div className="chat-container">
-                <div className="chat-header">
-                    {isGroupChat ? (
-                        <div className="convo-avatar group-avatar chat-avatar">
-                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
-                        </div>
-                    ) : (
-                        <img src={otherUser.profilePicture || `https://api.dicebear.com/7.x/initials/svg?seed=${otherUser.fullName}`} alt={otherUser.fullName} className="chat-avatar" />
-                    )}
-                    <h3>{chatTarget.name || chatTarget.fullName}</h3>
-                </div>
-                <div className="chat-body" ref={chatBodyRef}>
-                    {chatMessages.map(msg => {
-                        const sender = findSender(msg.from);
-                        const isSent = msg.from === currentUser.id;
-                        return (
-                            <div key={msg.id} className={`chat-bubble-wrapper ${isSent ? 'sent' : 'received'}`}>
-                                {!isSent && isGroupChat && sender && (
-                                     <span className="message-sender-name">{sender.firstName}</span>
-                                )}
-                                <div className={`chat-bubble ${isSent ? 'sent' : 'received'}`}>
-                                    <p>{msg.text}</p>
-                                    <span className="message-time">{formatTime(msg.timestamp)}</span>
+            {Object.keys(groupedAssignments).length > 0 ? (
+                Object.entries(groupedAssignments).sort(([a], [b]) => a.localeCompare(b)).map(([courseCode, assignmentList]) => (
+                    <div className="card" key={courseCode} style={{ marginBottom: '2rem' }}>
+                        <h3>{courseCode}</h3>
+                        {assignmentList.sort((a,b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()).map(item => (
+                             <div className="assignment-item" key={item.id}>
+                                <div>
+                                    <h4>{item.title}</h4>
+                                    <p>{item.description}</p>
+                                </div>
+                                <div className="assignment-due-date">
+                                    <strong>Due:</strong> {new Date(item.dueDate).toLocaleDateString()}
                                 </div>
                             </div>
-                        )
-                    })}
-                </div>
-                <form className="chat-footer" onSubmit={handleSend}>
-                    <textarea 
-                        ref={textareaRef}
-                        className="chat-input"
-                        value={newMessage} 
-                        onChange={e => setNewMessage(e.target.value)} 
-                        onKeyDown={handleKeyDown}
-                        placeholder="Type a message..." 
-                        rows="1"
-                        aria-label="Chat message input"
-                    />
-                    <button type="submit" className="btn-send" aria-label="Send Message" disabled={!newMessage.trim()}>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z"/></svg>
-                    </button>
-                </form>
-            </div>
+                        ))}
+                    </div>
+                ))
+            ) : <div className="empty-state"><p>No assignments have been posted yet.</p></div>}
         </div>
     );
 };
 
-// --- LAYOUT & MAIN APP ---
+interface ResourceLibraryPageProps {
+    resources: Resource[];
+    currentUser: CurrentUser;
+    onAddResource: (data: Omit<Resource, 'id'>) => void;
+}
+const ResourceLibraryPage = ({ resources, currentUser, onAddResource }: ResourceLibraryPageProps) => {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [formData, setFormData] = useState({ title: '', courseCode: '' });
+    const [file, setFile] = useState<File | null>(null);
+    const [error, setError] = useState('');
 
-const NotificationBell = ({ notifications, setRoute, onMarkAsRead }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const unreadCount = notifications.filter(n => !n.read).length;
-    const ref = useRef(null);
-
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (ref.current && !ref.current.contains(event.target)) {
-                setIsOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [ref]);
-
-    const handleNotificationClick = (notification) => {
-        onMarkAsRead(notification.id);
-        setIsOpen(false);
-        if (notification.link) {
-            setRoute(notification.link);
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            setFile(e.target.files[0]);
         }
     };
+    
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        if (!file || !formData.title || !formData.courseCode) {
+            setError('All fields are required.');
+            return;
+        }
+        try {
+            const base64Data = await getFileAsBase64(file);
+            onAddResource({
+                title: formData.title,
+                courseCode: formData.courseCode,
+                uploaderId: currentUser.id,
+                name: file.name,
+                type: file.type,
+                data: base64Data,
+            });
+            setFormData({ title: '', courseCode: '' });
+            setFile(null);
+            setIsModalOpen(false);
+        } catch (err) {
+            setError('Failed to upload file. Please try again.');
+            console.error(err);
+        }
+    };
+    
+    const groupedResources = resources.reduce((acc, res) => {
+        (acc[res.courseCode] = acc[res.courseCode] || []).push(res);
+        return acc;
+    }, {} as Record<string, Resource[]>);
 
     return (
-        <div className="notification-area" ref={ref}>
-            <button className="notification-btn" onClick={() => setIsOpen(!isOpen)} aria-label={`Notifications (${unreadCount} unread)`}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-                {unreadCount > 0 && <span className="notification-badge">{unreadCount}</span>}
-            </button>
-            {isOpen && (
-                <div className="notification-dropdown">
-                    {notifications.length > 0 ? (
-                        notifications.map(n => (
-                            <div key={n.id} className={`notification-item ${n.read ? 'read' : ''}`} onClick={() => handleNotificationClick(n)}>
-                                <p>{n.text}</p>
-                                <span className="notification-time">{new Date(n.timestamp).toLocaleString()}</span>
-                            </div>
-                        ))
-                    ) : (
-                        <div className="notification-item"><p>No notifications yet.</p></div>
-                    )}
+        <div>
+            <div className="page-header-with-action">
+                <div>
+                    <h1 className="page-title">Resource Library</h1>
+                    <p className="page-subtitle">Shared lecture notes, e-books, and past questions.</p>
                 </div>
+                <button className="btn-primary" onClick={() => setIsModalOpen(true)}>+ Upload Resource</button>
+            </div>
+            
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Upload New Resource">
+                <form onSubmit={handleSubmit}>
+                    {error && <p className="error-message">{error}</p>}
+                    <div className="form-group">
+                        <label>Title</label>
+                        <input type="text" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required />
+                    </div>
+                    <div className="form-group">
+                        <label>Course Code</label>
+                        <select value={formData.courseCode} onChange={e => setFormData({...formData, courseCode: e.target.value})} required>
+                            <option value="">Select a course</option>
+                            {ALL_COURSE_CODES.map(code => <option key={code} value={code}>{code}</option>)}
+                        </select>
+                    </div>
+                    <div className="form-group">
+                        <label>File</label>
+                        <input type="file" onChange={handleFileChange} required />
+                    </div>
+                    <div className="form-actions">
+                        <button type="button" className="btn-tertiary" onClick={() => setIsModalOpen(false)}>Cancel</button>
+                        <button type="submit" className="btn-secondary">Upload</button>
+                    </div>
+                </form>
+            </Modal>
+
+            {Object.keys(groupedResources).length > 0 ? (
+                Object.entries(groupedResources).sort(([a], [b]) => a.localeCompare(b)).map(([courseCode, resList]) => (
+                    <div className="card" key={courseCode} style={{marginBottom: '2rem'}}>
+                        <h3>{courseCode}</h3>
+                        {resList.map(res => (
+                            <div className="resource-item" key={res.id}>
+                                <div>
+                                    <strong>{res.title}</strong>
+                                    <p style={{fontSize: '0.9rem', color: '#6B7280'}}>{res.name}</p>
+                                </div>
+                                <a href={res.data} download={res.name} className="btn-primary btn-sm">Download</a>
+                            </div>
+                        ))}
+                    </div>
+                ))
+            ) : <div className="empty-state"><p>No resources have been uploaded yet.</p></div>}
+        </div>
+    );
+};
+
+interface QuizzesPageProps {
+    quizzes: Quiz[];
+    submissions: QuizSubmission[];
+    currentUser: CurrentUser;
+    setRoute: (route: Route) => void;
+}
+const QuizzesPage = ({ quizzes, submissions, currentUser, setRoute }: QuizzesPageProps) => {
+    const isAdmin = currentUser.role === 'Admin' || currentUser.role === 'Class President';
+    const userSubmissions = submissions.filter(s => s.userId === currentUser.id);
+
+    return (
+        <div>
+            <div className="page-header-with-action">
+                <div>
+                    <h1 className="page-title">Quizzes</h1>
+                    <p className="page-subtitle">Test your knowledge and prepare for exams.</p>
+                </div>
+                {isAdmin && <button className="btn-primary" onClick={() => setRoute({ page: 'createQuiz' })}>+ Create Quiz</button>}
+            </div>
+
+            {quizzes.length > 0 ? (
+                <div className="card-grid">
+                    {quizzes.map(quiz => {
+                        const submission = userSubmissions.find(s => s.quizId === quiz.id);
+                        return (
+                            <div className="card quiz-card" key={quiz.id}>
+                                <h3>{quiz.title}</h3>
+                                <p>{quiz.courseCode}</p>
+                                <p style={{ flexGrow: 1 }}>{quiz.questions.length} questions</p>
+                                {submission ? (
+                                    <button className="btn-secondary" onClick={() => setRoute({ page: 'quizResults', submissionId: submission.id })}>
+                                        View Results (Score: {submission.score}/{quiz.questions.length})
+                                    </button>
+                                ) : (
+                                    <button className="btn-primary" onClick={() => setRoute({ page: 'takeQuiz', quizId: quiz.id })}>
+                                        Take Quiz
+                                    </button>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            ) : (
+                <div className="empty-state"><p>No quizzes have been created yet.</p></div>
             )}
         </div>
     );
 };
 
-const Header = ({ currentUser, setRoute, route, onSignOut, notifications, onMarkAsRead }) => {
-    const isAdmin = currentUser.role === 'Class President' || currentUser.role === 'Admin';
-    const navLinks = [
-        { page: 'home', label: 'Home' },
-        { page: 'announcements', label: 'Announcements' },
-        { page: 'faculty', label: 'Faculty' },
-        { page: 'courses', label: 'Courses' },
-        { page: 'documents', label: 'Documents' },
-        { page: 'quizzes', label: 'Quizzes' },
-        { page: 'members', label: 'Members' },
-        { page: 'messages', label: 'Messages' },
-        isAdmin && { page: 'admin', label: 'Admin Panel' }
-    ].filter(Boolean);
+interface CreateQuizPageProps {
+    onAddQuiz: (quiz: Omit<Quiz, 'id' | 'creatorId'>) => void;
+    setRoute: (route: Route) => void;
+}
+const CreateQuizPage = ({ onAddQuiz, setRoute }: CreateQuizPageProps) => {
+    const [title, setTitle] = useState('');
+    const [courseCode, setCourseCode] = useState('');
+    const [questions, setQuestions] = useState<Omit<QuizQuestion, 'id'>[]>([{ text: '', options: ['', ''], correctAnswerIndex: 0 }]);
+
+    const handleQuestionChange = (index: number, value: string) => {
+        const newQuestions = [...questions];
+        newQuestions[index].text = value;
+        setQuestions(newQuestions);
+    };
+
+    const handleOptionChange = (qIndex: number, oIndex: number, value: string) => {
+        const newQuestions = [...questions];
+        newQuestions[qIndex].options[oIndex] = value;
+        setQuestions(newQuestions);
+    };
+
+    const handleCorrectAnswerChange = (qIndex: number, oIndex: number) => {
+        const newQuestions = [...questions];
+        newQuestions[qIndex].correctAnswerIndex = oIndex;
+        setQuestions(newQuestions);
+    };
+    
+    const addQuestion = () => setQuestions([...questions, { text: '', options: ['', ''], correctAnswerIndex: 0 }]);
+    const removeQuestion = (index: number) => setQuestions(questions.filter((_, i) => i !== index));
+
+    const addOption = (qIndex: number) => {
+        const newQuestions = [...questions];
+        newQuestions[qIndex].options.push('');
+        setQuestions(newQuestions);
+    };
+    const removeOption = (qIndex: number, oIndex: number) => {
+        const newQuestions = [...questions];
+        newQuestions[qIndex].options = newQuestions[qIndex].options.filter((_, i) => i !== oIndex);
+        setQuestions(newQuestions);
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onAddQuiz({ title, courseCode, questions });
+        setRoute({ page: 'quizzes' });
+    };
 
     return (
-        <header className="header">
-            <div className="container">
-                <h1 className="logo">LAUTECH ECO'29</h1>
-                <nav>
-                    {navLinks.map(link => (
-                        <a href="#" key={link.page} className={route.page === link.page ? 'active' : ''} onClick={(e) => { e.preventDefault(); setRoute({ page: link.page }); }}>
-                            {link.label}
-                        </a>
-                    ))}
-                </nav>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <NotificationBell notifications={notifications} setRoute={setRoute} onMarkAsRead={onMarkAsRead} />
-                    <a href="#" onClick={(e) => { e.preventDefault(); setRoute({ page: 'profile' }); }} title="My Profile">
-                        <img src={currentUser.profilePicture || `https://api.dicebear.com/7.x/initials/svg?seed=${currentUser.fullName}`} alt="Profile" className="header-profile-pic" />
-                    </a>
-                    <button onClick={onSignOut} className="sign-out-btn">Sign Out</button>
+        <div>
+            <a href="#" onClick={e => {e.preventDefault(); setRoute({page: 'quizzes'})}} style={{marginBottom: '2rem', display: 'inline-block'}}>&larr; Back to Quizzes</a>
+            <h1 className="page-title">Create New Quiz</h1>
+            <form onSubmit={handleSubmit} className="card create-quiz-form">
+                <div className="form-group"><label>Quiz Title</label><input type="text" value={title} onChange={e => setTitle(e.target.value)} required /></div>
+                <div className="form-group"><label>Course Code</label>
+                    <select value={courseCode} onChange={e => setCourseCode(e.target.value)} required>
+                        <option value="">Select a course</option>
+                        {ALL_COURSE_CODES.map(code => <option key={code} value={code}>{code}</option>)}
+                    </select>
                 </div>
-            </div>
-        </header>
+                <hr/>
+                {questions.map((q, qIndex) => (
+                    <div key={qIndex} className="quiz-question-editor">
+                        <h4>Question {qIndex + 1}</h4>
+                        <div className="form-group"><label>Question Text</label><textarea value={q.text} onChange={e => handleQuestionChange(qIndex, e.target.value)} required></textarea></div>
+                        <div className="form-group"><label>Options</label>
+                            {q.options.map((opt, oIndex) => (
+                                <div key={oIndex} className="quiz-option-editor">
+                                    <input type="radio" name={`correct-answer-${qIndex}`} checked={q.correctAnswerIndex === oIndex} onChange={() => handleCorrectAnswerChange(qIndex, oIndex)} />
+                                    <input type="text" value={opt} onChange={e => handleOptionChange(qIndex, oIndex, e.target.value)} required />
+                                    {q.options.length > 2 && <button type="button" onClick={() => removeOption(qIndex, oIndex)}>&times;</button>}
+                                </div>
+                            ))}
+                        </div>
+                         <div className="form-actions" style={{justifyContent: 'flex-start'}}>
+                             <button type="button" className="btn-tertiary btn-sm" onClick={() => addOption(qIndex)}>+ Add Option</button>
+                             {questions.length > 1 && <button type="button" className="btn-danger btn-sm" onClick={() => removeQuestion(qIndex)}>Remove Question</button>}
+                         </div>
+                    </div>
+                ))}
+                <hr/>
+                <div className="form-actions" style={{justifyContent: 'space-between'}}>
+                    <button type="button" className="btn-secondary" onClick={addQuestion}>+ Add Question</button>
+                    <button type="submit" className="btn-primary">Save Quiz</button>
+                </div>
+            </form>
+        </div>
     );
 };
 
-const Hero = ({ currentUser }) => (
-    <section className="hero">
-        <div className="container">
-            <h1 className="welcome-message">Welcome, {currentUser.firstName}</h1>
-            <p>Department of Economics Community Portal. Stay connected with course updates, announcements, and fellow students.</p>
+interface TakeQuizPageProps {
+    quiz: Quiz;
+    currentUser: CurrentUser;
+    onSubmit: (submission: Omit<QuizSubmission, 'id' | 'timestamp'>) => number; // returns submissionId
+    setRoute: (route: Route) => void;
+}
+const TakeQuizPage = ({ quiz, currentUser, onSubmit, setRoute }: TakeQuizPageProps) => {
+    const [answers, setAnswers] = useState<(number | null)[]>(Array(quiz.questions.length).fill(null));
+
+    const handleAnswerChange = (qIndex: number, oIndex: number) => {
+        const newAnswers = [...answers];
+        newAnswers[qIndex] = oIndex;
+        setAnswers(newAnswers);
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        let score = 0;
+        quiz.questions.forEach((q, i) => {
+            if (q.correctAnswerIndex === answers[i]) {
+                score++;
+            }
+        });
+        const submissionId = onSubmit({ userId: currentUser.id, quizId: quiz.id, answers, score });
+        setRoute({ page: 'quizResults', submissionId });
+    };
+
+    return (
+        <div className="take-quiz-container">
+            <h1 className="page-title">{quiz.title}</h1>
+            <p className="page-subtitle">{quiz.courseCode}</p>
+            <form onSubmit={handleSubmit}>
+                {quiz.questions.map((q, qIndex) => (
+                    <div className="card quiz-question-display" key={qIndex}>
+                        <h4>Question {qIndex + 1}</h4>
+                        <p>{q.text}</p>
+                        <div className="quiz-options">
+                            {q.options.map((opt, oIndex) => (
+                                <label key={oIndex} className={`quiz-option-label ${answers[qIndex] === oIndex ? 'selected' : ''}`}>
+                                    <input type="radio" name={`question-${qIndex}`} value={oIndex} onChange={() => handleAnswerChange(qIndex, oIndex)} required />
+                                    {opt}
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                ))}
+                <div style={{textAlign: 'center', marginTop: '2rem'}}>
+                    <button type="submit" className="btn-primary">Submit Quiz</button>
+                </div>
+            </form>
         </div>
-    </section>
-);
+    );
+};
 
-const Footer = () => (
-    <footer className="footer">
-        <div className="container">
-            <div className="footer-grid">
-                <div>
-                    <h4>About Us</h4>
-                    <p>The official community portal for the 2029 graduating class of the Department of Economics at LAUTECH.</p>
-                </div>
-                <div>
-                    <h4>Quick Links</h4>
-                    <ul>
-                        <li><a href="#">Home</a></li>
-                        <li><a href="#">Announcements</a></li>
-                        <li><a href="#">Courses</a></li>
-                    </ul>
-                </div>
-                <div>
-                    <h4>Contact</h4>
-                    <p>Department of Economics,<br />LAUTECH, Ogbomoso, Nigeria.</p>
-                </div>
+interface QuizResultsPageProps {
+    quiz: Quiz;
+    submission: QuizSubmission;
+    setRoute: (route: Route) => void;
+}
+const QuizResultsPage = ({ quiz, submission, setRoute }: QuizResultsPageProps) => {
+    return (
+        <div className="quiz-results-container">
+             <a href="#" onClick={e => {e.preventDefault(); setRoute({page: 'quizzes'})}} style={{marginBottom: '2rem', display: 'inline-block'}}>&larr; Back to Quizzes</a>
+            <h1 className="page-title">Quiz Results: {quiz.title}</h1>
+            <div className="card quiz-score-summary">
+                <h2>Your Score: {submission.score} / {quiz.questions.length}</h2>
+                <p>That's {((submission.score / quiz.questions.length) * 100).toFixed(0)}%</p>
             </div>
-            <div className="copyright">
-                <p>&copy; {new Date().getFullYear()} LAUTECH Economics Class of '29. All Rights Reserved.</p>
-            </div>
+             {quiz.questions.map((q, qIndex) => {
+                const userAnswer = submission.answers[qIndex];
+                const isCorrect = q.correctAnswerIndex === userAnswer;
+                return (
+                    <div className={`card quiz-result-item ${isCorrect ? 'correct' : 'incorrect'}`} key={qIndex}>
+                        <h4>Question {qIndex + 1}: {q.text}</h4>
+                        <ul>
+                        {q.options.map((opt, oIndex) => {
+                            let className = '';
+                            if (oIndex === q.correctAnswerIndex) className = 'correct-answer';
+                            else if (oIndex === userAnswer) className = 'incorrect-answer';
+                            return <li key={oIndex} className={className}>{opt}</li>;
+                        })}
+                        </ul>
+                    </div>
+                )
+             })}
         </div>
-    </footer>
-);
+    );
+};
 
 
-const App = () => {
-    const [users, setUsers] = useLocalStorage('app_users', []);
-    const [currentUser, setCurrentUser] = useLocalStorage('app_currentUser', null);
-    const [route, setRoute] = useLocalStorage('app_route', { page: 'home' });
-    const [approvedMatricNumbers, setApprovedMatricNumbers] = useLocalStorage('app_approvedMatric', INITIAL_MATRIC_NUMBERS);
-    const [announcements, setAnnouncements] = useLocalStorage('app_announcements', []);
-    const [faculty, setFaculty] = useLocalStorage('app_faculty', []);
-    const [courses, setCourses] = useLocalStorage('app_courses', INITIAL_COURSES_DATA);
-    const [documents, setDocuments] = useLocalStorage('app_documents', []);
-    const [quizzes, setQuizzes] = useLocalStorage('app_quizzes', []);
-    const [submissions, setSubmissions] = useLocalStorage('app_submissions', []);
-    const [messages, setMessages] = useLocalStorage('app_messages', []);
-    const [notifications, setNotifications] = useLocalStorage('app_notifications', []);
-    const [groups, setGroups] = useLocalStorage('app_groups', []);
+interface GradebookPageProps {
+    currentUser: CurrentUser;
+    customGrades: CustomGrade[];
+    onAddCustomGrade: (grade: Omit<CustomGrade, 'id' | 'userId'>) => void;
+}
+const GradebookPage = ({ currentUser, customGrades, onAddCustomGrade }: GradebookPageProps) => {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [formData, setFormData] = useState({ courseCode: '', itemName: '', score: '', total: '' });
 
-    // --- Handlers ---
-    const handleSignUp = (formData: Record<string, any>) => {
-        const newUser = {
-            id: Date.now(),
+    const userGrades = customGrades.filter(g => g.userId === currentUser.id);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onAddCustomGrade({
             ...formData,
+            score: parseFloat(formData.score),
+            total: parseFloat(formData.total),
+        });
+        setIsModalOpen(false);
+        setFormData({ courseCode: '', itemName: '', score: '', total: '' });
+    };
+
+    const groupedGrades = userGrades.reduce((acc, grade) => {
+        (acc[grade.courseCode] = acc[grade.courseCode] || []).push(grade);
+        return acc;
+    }, {} as Record<string, CustomGrade[]>);
+
+    return (
+        <div>
+            <div className="page-header-with-action">
+                <div>
+                    <h1 className="page-title">Gradebook</h1>
+                    <p className="page-subtitle">Track your scores for assignments, quizzes, and exams.</p>
+                </div>
+                <button className="btn-primary" onClick={() => setIsModalOpen(true)}>+ Add Grade</button>
+            </div>
+
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add New Grade">
+                <form onSubmit={handleSubmit}>
+                    <div className="form-group"><label>Course Code</label>
+                        <select value={formData.courseCode} onChange={e => setFormData({ ...formData, courseCode: e.target.value })} required>
+                             <option value="">Select a course</option>
+                            {ALL_COURSE_CODES.map(code => <option key={code} value={code}>{code}</option>)}
+                        </select>
+                    </div>
+                    <div className="form-group"><label>Item Name (e.g., Midterm 1)</label><input type="text" value={formData.itemName} onChange={e => setFormData({ ...formData, itemName: e.target.value })} required /></div>
+                    <div className="form-group"><label>Your Score</label><input type="number" value={formData.score} onChange={e => setFormData({ ...formData, score: e.target.value })} required /></div>
+                    <div className="form-group"><label>Total Possible Score</label><input type="number" value={formData.total} onChange={e => setFormData({ ...formData, total: e.target.value })} required /></div>
+                    <div className="form-actions">
+                        <button type="button" className="btn-tertiary" onClick={() => setIsModalOpen(false)}>Cancel</button>
+                        <button type="submit" className="btn-secondary">Save Grade</button>
+                    </div>
+                </form>
+            </Modal>
+            
+            <div className="gradebook-grid">
+            {Object.keys(groupedGrades).length > 0 ? (
+                Object.entries(groupedGrades).sort(([a], [b]) => a.localeCompare(b)).map(([courseCode, grades]) => {
+                    const totalScore = grades.reduce((acc, g) => acc + g.score, 0);
+                    const totalPossible = grades.reduce((acc, g) => acc + g.total, 0);
+                    const average = totalPossible > 0 ? ((totalScore / totalPossible) * 100).toFixed(2) : 'N/A';
+                    return (
+                        <div className="card course-grade-card" key={courseCode}>
+                            <div className="course-grade-header">
+                                <h3>{courseCode}</h3>
+                                <p>Average: <strong>{average}%</strong></p>
+                            </div>
+                            <table className="grade-table">
+                                <thead><tr><th>Item</th><th>Score</th></tr></thead>
+                                <tbody>
+                                    {grades.map(grade => (
+                                        <tr key={grade.id}><td>{grade.itemName}</td><td>{grade.score} / {grade.total}</td></tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )
+                })
+             ) : <div className="empty-state" style={{gridColumn: '1 / -1'}}><p>No grades added yet. Click "+ Add Grade" to start.</p></div>}
+             </div>
+        </div>
+    );
+};
+
+interface GpaCalculatorPageProps {
+    currentUser: CurrentUser;
+    gpaEntries: GpaEntry[];
+    onAddGpaEntry: (entry: Omit<GpaEntry, 'id' | 'userId'>) => void;
+}
+const GpaCalculatorPage = ({ currentUser, gpaEntries, onAddGpaEntry }: GpaCalculatorPageProps) => {
+    const [formData, setFormData] = useState({ courseCode: '', grade: 'A' as GpaEntry['grade'], units: '3', semester: ''});
+
+    const gradePoints = { 'A': 5, 'B': 4, 'C': 3, 'D': 2, 'E': 1, 'F': 0 };
+
+    const calculateGpa = (entries: GpaEntry[]) => {
+        if(entries.length === 0) return '0.00';
+        const totalPoints = entries.reduce((acc, entry) => acc + (gradePoints[entry.grade] * entry.units), 0);
+        const totalUnits = entries.reduce((acc, entry) => acc + entry.units, 0);
+        return totalUnits > 0 ? (totalPoints / totalUnits).toFixed(2) : '0.00';
+    };
+
+    const userEntries = gpaEntries.filter(e => e.userId === currentUser.id);
+    const overallGpa = calculateGpa(userEntries);
+    
+    const semesters = [...new Set(userEntries.map(e => e.semester))].sort().reverse();
+
+    const handleFormSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onAddGpaEntry({
+            ...formData,
+            units: parseInt(formData.units)
+        });
+        setFormData({ courseCode: '', grade: 'A', units: '3', semester: ''});
+    };
+
+    return (
+        <div>
+            <h1 className="page-title">GPA Calculator</h1>
+            <p className="page-subtitle">Track your grades to calculate semester and cumulative GPA.</p>
+            <div className="gpa-calculator-grid">
+                <div>
+                    <div className="card gpa-results-card">
+                        <h3>Your Cumulative GPA (CGPA)</h3>
+                        <p>{overallGpa}</p>
+                    </div>
+                    <div className="card" style={{marginTop: '2rem'}}>
+                        <h3>Add a New Course Grade</h3>
+                        <form onSubmit={handleFormSubmit}>
+                            <div className="form-group"><label>Semester (e.g., 2024 Harmattan)</label><input type="text" value={formData.semester} onChange={e => setFormData({...formData, semester: e.target.value})} required/></div>
+                            <div className="form-group"><label>Course Code</label><input type="text" value={formData.courseCode} onChange={e => setFormData({...formData, courseCode: e.target.value.toUpperCase()})} required/></div>
+                            <div className="form-group"><label>Grade</label><select value={formData.grade} onChange={e => setFormData({...formData, grade: e.target.value as GpaEntry['grade']})}><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option><option>F</option></select></div>
+                            <div className="form-group"><label>Units</label><input type="number" min="0" value={formData.units} onChange={e => setFormData({...formData, units: e.target.value})} required/></div>
+                            <button type="submit" className="btn-primary">Add Grade</button>
+                        </form>
+                    </div>
+                </div>
+                <div>
+                {semesters.map(semester => {
+                    const semesterEntries = userEntries.filter(e => e.semester === semester);
+                    const semesterGpa = calculateGpa(semesterEntries);
+                    return (
+                        <div className="card" key={semester} style={{marginBottom: '2rem'}}>
+                            <h3>{semester} - GPA: {semesterGpa}</h3>
+                            <table className="user-table">
+                                <thead><tr><th>Course</th><th>Units</th><th>Grade</th></tr></thead>
+                                <tbody>
+                                    {semesterEntries.map(entry => (
+                                        <tr key={entry.id}><td>{entry.courseCode}</td><td>{entry.units}</td><td>{entry.grade}</td></tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )
+                })}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+interface ForumsPageProps {
+    threads: ForumThread[];
+    currentUser: CurrentUser;
+    onAddForumThread: (data: { title: string, content: string }) => void;
+    users: User[];
+    setRoute: (route: Route) => void;
+}
+const ForumsPage = ({ threads, currentUser, onAddForumThread, users, setRoute }: ForumsPageProps) => {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [formData, setFormData] = useState({ title: '', content: '' });
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onAddForumThread(formData);
+        setIsModalOpen(false);
+        setFormData({ title: '', content: '' });
+    };
+
+    const getUser = (id: number) => users.find(u => u.id === id);
+
+    return (
+        <div>
+            <div className="page-header-with-action">
+                <div>
+                    <h1 className="page-title">Forums</h1>
+                    <p className="page-subtitle">Discuss course topics and connect with classmates.</p>
+                </div>
+                <button className="btn-primary" onClick={() => setIsModalOpen(true)}>+ New Thread</button>
+            </div>
+
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Start a New Discussion">
+                <form onSubmit={handleSubmit}>
+                    <div className="form-group"><label>Thread Title</label><input type="text" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} required /></div>
+                    <div className="form-group"><label>Your Message</label><textarea value={formData.content} onChange={e => setFormData({ ...formData, content: e.target.value })} required rows={5}></textarea></div>
+                    <div className="form-actions">
+                        <button type="button" className="btn-tertiary" onClick={() => setIsModalOpen(false)}>Cancel</button>
+                        <button type="submit" className="btn-secondary">Post Thread</button>
+                    </div>
+                </form>
+            </Modal>
+
+            <div className="card">
+                <table className="forum-table">
+                    <thead><tr><th>Topic</th><th>Author</th><th>Replies</th><th>Last Post</th></tr></thead>
+                    <tbody>
+                        {threads.sort((a,b) => b.posts[b.posts.length - 1].timestamp - a.posts[a.posts.length - 1].timestamp).map(thread => {
+                             const author = getUser(thread.authorId);
+                             const lastPost = thread.posts[thread.posts.length-1];
+                             const lastPoster = getUser(lastPost.authorId);
+                             return (
+                                <tr key={thread.id} onClick={() => setRoute({ page: 'viewForumThread', threadId: thread.id })}>
+                                    <td><strong>{thread.title}</strong></td>
+                                    <td>{author?.username || 'Unknown'}</td>
+                                    <td>{thread.posts.length - 1}</td>
+                                    <td>by {lastPoster?.username || 'Unknown'} <br/><small>{new Date(lastPost.timestamp).toLocaleString()}</small></td>
+                                </tr>
+                             )
+                        })}
+                    </tbody>
+                </table>
+                 {threads.length === 0 && <div className="empty-state"><p>No discussions yet. Be the first to start one!</p></div>}
+            </div>
+        </div>
+    );
+};
+
+interface ViewForumThreadPageProps {
+    thread: ForumThread;
+    users: User[];
+    currentUser: CurrentUser;
+    onAddPost: (threadId: number, content: string) => void;
+    setRoute: (route: Route) => void;
+}
+const ViewForumThreadPage = ({ thread, users, currentUser, onAddPost, setRoute }: ViewForumThreadPageProps) => {
+    const [reply, setReply] = useState('');
+    const getUser = (id: number) => users.find(u => u.id === id);
+
+    const handleReply = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (reply.trim()) {
+            onAddPost(thread.id, reply);
+            setReply('');
+        }
+    };
+    
+    return (
+        <div>
+            <a href="#" onClick={e => {e.preventDefault(); setRoute({page: 'forums'})}} style={{marginBottom: '2rem', display: 'inline-block'}}>&larr; Back to Forums</a>
+            <h1 className="page-title">{thread.title}</h1>
+            
+            {thread.posts.map(post => {
+                const author = getUser(post.authorId);
+                return (
+                    <div className="forum-post card" key={post.id}>
+                        <div className="post-author">
+                            <img src={author?.profilePicture || `https://api.dicebear.com/7.x/initials/svg?seed=${author?.fullName}`} alt={author?.fullName}/>
+                            <strong>{author?.fullName || 'Unknown'}</strong>
+                            <small>{new Date(post.timestamp).toLocaleString()}</small>
+                        </div>
+                        <div className="post-content">
+                            <p>{post.content}</p>
+                        </div>
+                    </div>
+                )
+            })}
+            
+            <div className="card reply-form">
+                <h3>Post a Reply</h3>
+                <form onSubmit={handleReply}>
+                    <div className="form-group">
+                        <textarea value={reply} onChange={e => setReply(e.target.value)} rows={5} required placeholder="Write your reply here..."></textarea>
+                    </div>
+                    <div className="form-actions">
+                        <button type="submit" className="btn-primary">Post Reply</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+interface PollsPageProps {
+    polls: Poll[];
+    currentUser: CurrentUser;
+    onAddPoll: (poll: Omit<Poll, 'id' | 'createdBy'>) => void;
+    onVote: (pollId: number, optionIndex: number) => void;
+}
+const PollsPage = ({ polls, currentUser, onAddPoll, onVote }: PollsPageProps) => {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [question, setQuestion] = useState('');
+    const [options, setOptions] = useState(['', '']);
+    const isAdmin = currentUser.role === 'Admin' || currentUser.role === 'Class President';
+
+    const handleOptionChange = (index: number, value: string) => {
+        const newOptions = [...options];
+        newOptions[index] = value;
+        setOptions(newOptions);
+    };
+
+    const addOption = () => setOptions([...options, '']);
+    const removeOption = (index: number) => setOptions(options.filter((_, i) => i !== index));
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const finalOptions = options.filter(opt => opt.trim() !== '').map(opt => ({ text: opt, votes: [] }));
+        if (question.trim() && finalOptions.length >= 2) {
+            onAddPoll({ question, options: finalOptions });
+            setIsModalOpen(false);
+            setQuestion('');
+            setOptions(['', '']);
+        }
+    };
+
+    return (
+        <div>
+            <div className="page-header-with-action">
+                <div>
+                    <h1 className="page-title">Polls & Surveys</h1>
+                    <p className="page-subtitle">Gather feedback and opinions from the community.</p>
+                </div>
+                {isAdmin && <button className="btn-primary" onClick={() => setIsModalOpen(true)}>+ Create Poll</button>}
+            </div>
+
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Create New Poll">
+                <form onSubmit={handleSubmit}>
+                    <div className="form-group"><label>Poll Question</label><input type="text" value={question} onChange={e => setQuestion(e.target.value)} required /></div>
+                    <div className="form-group"><label>Options</label>
+                        {options.map((opt, index) => (
+                            <div className="poll-option-editor" key={index}>
+                                <input type="text" value={opt} onChange={e => handleOptionChange(index, e.target.value)} required />
+                                {options.length > 2 && <button type="button" onClick={() => removeOption(index)}>&times;</button>}
+                            </div>
+                        ))}
+                        <button type="button" className="btn-tertiary btn-sm" onClick={addOption} style={{ marginTop: '0.5rem' }}>+ Add Option</button>
+                    </div>
+                    <div className="form-actions">
+                        <button type="button" className="btn-tertiary" onClick={() => setIsModalOpen(false)}>Cancel</button>
+                        <button type="submit" className="btn-secondary">Create Poll</button>
+                    </div>
+                </form>
+            </Modal>
+
+            <div className="card-grid">
+                {polls.map(poll => {
+                    const userHasVoted = poll.options.some(opt => opt.votes.includes(currentUser.id));
+                    const totalVotes = poll.options.reduce((acc, opt) => acc + opt.votes.length, 0);
+
+                    return (
+                        <div className="card poll-card" key={poll.id}>
+                            <h4>{poll.question}</h4>
+                            <div className="poll-options-container">
+                                {poll.options.map((option, index) => {
+                                    const percentage = totalVotes > 0 ? (option.votes.length / totalVotes) * 100 : 0;
+                                    return (
+                                        <div key={index}>
+                                            {userHasVoted ? (
+                                                <div className="poll-result">
+                                                    <div className="poll-result-bar" style={{ width: `${percentage}%` }}></div>
+                                                    <span>{option.text} ({percentage.toFixed(0)}%)</span>
+                                                </div>
+                                            ) : (
+                                                <button className="poll-option" onClick={() => onVote(poll.id, index)}>
+                                                    {option.text}
+                                                </button>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            <small className="total-votes">{totalVotes} vote(s)</small>
+                        </div>
+                    );
+                })}
+            </div>
+            {polls.length === 0 && <div className="empty-state"><p>No polls have been created yet.</p></div>}
+        </div>
+    );
+};
+
+
+interface CalendarPageProps {
+    events: CalendarEvent[];
+    currentUser: CurrentUser;
+    onAddEvent: (event: Omit<CalendarEvent, 'id'>) => void;
+}
+const CalendarPage = ({ events, currentUser, onAddEvent }: CalendarPageProps) => {
+    const [currentDate, setCurrentDate] = useState(new Date());
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [formData, setFormData] = useState({ title: '', date: '', type: 'academic' as CalendarEvent['type'] });
+    const isAdmin = currentUser.role === 'Admin' || currentUser.role === 'Class President';
+
+    const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+    const startDay = startOfMonth.getDay();
+    const daysInMonth = endOfMonth.getDate();
+
+    const calendarDays = [];
+    for (let i = 0; i < startDay; i++) {
+        calendarDays.push(<div className="calendar-day empty" key={`empty-${i}`}></div>);
+    }
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const dayEvents = events.filter(e => e.date === dateStr);
+        calendarDays.push(
+            <div className="calendar-day" key={day}>
+                <span>{day}</span>
+                <div className="events-container">
+                    {dayEvents.map(e => <div key={e.id} className={`calendar-event ${e.type}`} title={e.title}></div>)}
+                </div>
+            </div>
+        );
+    }
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onAddEvent(formData);
+        setIsModalOpen(false);
+        setFormData({ title: '', date: '', type: 'academic' });
+    };
+
+    const changeMonth = (offset: number) => {
+        setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + offset, 1));
+    };
+
+    return (
+        <div>
+            <div className="page-header-with-action">
+                <div>
+                    <h1 className="page-title">Academic Calendar</h1>
+                    <p className="page-subtitle">Keep track of important dates, deadlines, and events.</p>
+                </div>
+                {isAdmin && <button className="btn-primary" onClick={() => setIsModalOpen(true)}>+ Add Event</button>}
+            </div>
+            
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add New Calendar Event">
+                <form onSubmit={handleSubmit}>
+                    <div className="form-group"><label>Event Title</label><input type="text" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} required /></div>
+                    <div className="form-group"><label>Date</label><input type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} required /></div>
+                    <div className="form-group"><label>Event Type</label>
+                        <select value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value as CalendarEvent['type'] })}>
+                            <option value="academic">Academic</option>
+                            <option value="social">Social</option>
+                            <option value="deadline">Deadline</option>
+                        </select>
+                    </div>
+                    <div className="form-actions">
+                        <button type="button" className="btn-tertiary" onClick={() => setIsModalOpen(false)}>Cancel</button>
+                        <button type="submit" className="btn-secondary">Add Event</button>
+                    </div>
+                </form>
+            </Modal>
+            
+            <div className="card">
+                <div className="calendar-header">
+                    <button onClick={() => changeMonth(-1)}>&larr;</button>
+                    <h2>{currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</h2>
+                    <button onClick={() => changeMonth(1)}>&rarr;</button>
+                </div>
+                <div className="calendar-grid">
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => <div className="calendar-day-name" key={day}>{day}</div>)}
+                    {calendarDays}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
+interface MessagesPageProps {
+    currentUser: CurrentUser;
+    users: User[];
+    messages: Message[];
+    onSendMessage: (to: number, text: string) => void;
+    route: Route;
+    setRoute: (route: Route) => void;
+}
+const MessagesPage = ({ currentUser, users, messages, onSendMessage, route, setRoute }: MessagesPageProps) => {
+    const activeConversationUserId = route.with;
+    const chatEndRef = useRef<HTMLDivElement>(null);
+    const [newMessage, setNewMessage] = useState('');
+
+    const conversations = [...new Set(
+        messages
+            .filter(m => m.from === currentUser.id || m.to === currentUser.id)
+            .flatMap(m => [m.from, m.to])
+    )].filter(id => id !== currentUser.id);
+
+    const activeChatMessages = messages
+        .filter(m => (m.from === currentUser.id && m.to === activeConversationUserId) || (m.from === activeConversationUserId && m.to === currentUser.id))
+        .sort((a, b) => a.timestamp - b.timestamp);
+    
+    useEffect(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [activeChatMessages]);
+
+    const handleSendMessage = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (newMessage.trim() && activeConversationUserId) {
+            onSendMessage(activeConversationUserId, newMessage.trim());
+            setNewMessage('');
+        }
+    };
+    
+    const getUser = (id: number) => users.find(u => u.id === id);
+
+    return (
+        <div className="messages-layout">
+            <div className="conversations-list card">
+                <h3>Conversations</h3>
+                {conversations.map(userId => {
+                    const user = getUser(userId);
+                    if (!user) return null;
+                    const lastMessage = [...messages].filter(m => m.from === userId || m.to === userId).pop();
+                    return (
+                        <div key={userId} className={`conversation-item ${activeConversationUserId === userId ? 'active' : ''}`} onClick={() => setRoute({ page: 'messages', with: userId })}>
+                             <img src={user.profilePicture || `https://api.dicebear.com/7.x/initials/svg?seed=${user.fullName}`} alt={user.fullName} />
+                            <div>
+                                <strong>{user.fullName}</strong>
+                                <p>{lastMessage?.text.substring(0, 25)}...</p>
+                            </div>
+                        </div>
+                    )
+                })}
+                 {conversations.length === 0 && <p>No conversations yet.</p>}
+            </div>
+            <div className="chat-window card">
+                {activeConversationUserId ? (
+                    <>
+                        <div className="chat-header">
+                            <h4>{getUser(activeConversationUserId)?.fullName || 'Select a conversation'}</h4>
+                        </div>
+                        <div className="message-area">
+                            {activeChatMessages.map(msg => (
+                                <div key={msg.id} className={`message-bubble ${msg.from === currentUser.id ? 'sent' : 'received'}`}>
+                                    <p>{msg.text}</p>
+                                    <small>{new Date(msg.timestamp).toLocaleTimeString()}</small>
+                                </div>
+                            ))}
+                            <div ref={chatEndRef} />
+                        </div>
+                        <form onSubmit={handleSendMessage} className="message-input-form">
+                            <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder="Type your message..." />
+                            <button type="submit" className="btn-primary">Send</button>
+                        </form>
+                    </>
+                ) : (
+                    <div className="empty-state">
+                        <p>Select a conversation to start chatting.</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+interface TutoringMarketplacePageProps {
+    currentUser: CurrentUser;
+    tutorProfiles: TutorProfile[];
+    onRegisterTutor: (profile: Omit<TutorProfile, 'userId'>) => void;
+}
+const TutoringMarketplacePage = ({ currentUser, tutorProfiles, onRegisterTutor }: TutoringMarketplacePageProps) => {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const existingProfile = tutorProfiles.find(p => p.userId === currentUser.id);
+    const [formData, setFormData] = useState(existingProfile || { subjects: [], rate: '', availability: '' });
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onRegisterTutor({
+            ...formData,
+            subjects: typeof formData.subjects === 'string' ? (formData.subjects as string).split(',').map(s => s.trim()) : formData.subjects,
+        });
+        setIsModalOpen(false);
+    };
+
+    return (
+        <div>
+            <div className="page-header-with-action">
+                <div>
+                    <h1 className="page-title">Tutoring Marketplace</h1>
+                    <p className="page-subtitle">Find peer tutors or offer your own services.</p>
+                </div>
+                <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
+                    {existingProfile ? 'Update Your Profile' : 'Become a Tutor'}
+                </button>
+            </div>
+
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={existingProfile ? 'Update Tutor Profile' : 'Tutor Registration'}>
+                <form onSubmit={handleSubmit}>
+                    <div className="form-group"><label>Subjects (comma-separated)</label><input type="text" value={Array.isArray(formData.subjects) ? formData.subjects.join(', ') : formData.subjects} onChange={e => setFormData({ ...formData, subjects: e.target.value })} required /></div>
+                    <div className="form-group"><label>Rate (e.g., ₦2000/hr)</label><input type="text" value={formData.rate} onChange={e => setFormData({ ...formData, rate: e.target.value })} required /></div>
+                    <div className="form-group"><label>Availability</label><textarea value={formData.availability} onChange={e => setFormData({ ...formData, availability: e.target.value })} required /></div>
+                    <div className="form-actions">
+                        <button type="button" className="btn-tertiary" onClick={() => setIsModalOpen(false)}>Cancel</button>
+                        <button type="submit" className="btn-secondary">Save Profile</button>
+                    </div>
+                </form>
+            </Modal>
+
+            <div className="directory-grid">
+                {tutorProfiles.map(profile => (
+                    <div className="card tutor-card" key={profile.userId}>
+                        <img src={currentUser.profilePicture || `https://api.dicebear.com/7.x/initials/svg?seed=${currentUser.fullName}`} alt={currentUser.fullName} />
+                        <h4>{currentUser.fullName}</h4>
+                        <p><strong>Subjects:</strong> {profile.subjects.join(', ')}</p>
+                        <p><strong>Rate:</strong> {profile.rate}</p>
+                        <p><strong>Availability:</strong> {profile.availability}</p>
+                    </div>
+                ))}
+            </div>
+             {tutorProfiles.length === 0 && <div className="empty-state"><p>No tutors have registered yet. Be the first!</p></div>}
+        </div>
+    );
+};
+
+interface PublicNotesPageProps {
+    currentUser: CurrentUser;
+    publicNotes: PublicNote[];
+    onAddPublicNote: (note: Omit<PublicNote, 'id' | 'authorId'>) => void;
+    users: User[];
+}
+const PublicNotesPage = ({ currentUser, publicNotes, onAddPublicNote, users }: PublicNotesPageProps) => {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [title, setTitle] = useState('');
+    const [file, setFile] = useState<File | null>(null);
+    const [error, setError] = useState('');
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) setFile(e.target.files[0]);
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        if (!file || !title) {
+            setError('Title and file are required.');
+            return;
+        }
+        try {
+            const base64Data = await getFileAsBase64(file);
+            onAddPublicNote({
+                title,
+                name: file.name,
+                type: file.type,
+                data: base64Data
+            });
+            setTitle('');
+            setFile(null);
+            setIsModalOpen(false);
+        } catch (err) {
+            setError('Failed to upload file.');
+        }
+    };
+    
+    const getAuthorName = (authorId: number) => users.find(u => u.id === authorId)?.fullName || 'Unknown';
+
+    return (
+        <div>
+            <div className="page-header-with-action">
+                <div>
+                    <h1 className="page-title">Public Notes</h1>
+                    <p className="page-subtitle">Share helpful documents with the entire community.</p>
+                </div>
+                <button className="btn-primary" onClick={() => setIsModalOpen(true)}>+ Upload Note</button>
+            </div>
+             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Upload Public Note">
+                <form onSubmit={handleSubmit}>
+                    {error && <p className="error-message">{error}</p>}
+                    <div className="form-group"><label>Title</label><input type="text" value={title} onChange={e => setTitle(e.target.value)} required /></div>
+                    <div className="form-group"><label>File</label><input type="file" onChange={handleFileChange} required /></div>
+                     <div className="form-actions">
+                        <button type="button" className="btn-tertiary" onClick={() => setIsModalOpen(false)}>Cancel</button>
+                        <button type="submit" className="btn-secondary">Upload</button>
+                    </div>
+                </form>
+            </Modal>
+            
+            <div className="card">
+            {publicNotes.length > 0 ? (
+                publicNotes.map(note => (
+                     <div className="resource-item" key={note.id}>
+                        <div>
+                            <strong>{note.title}</strong>
+                            <p style={{fontSize: '0.9rem', color: '#6B7280'}}>by {getAuthorName(note.authorId)} - {note.name}</p>
+                        </div>
+                        <a href={note.data} download={note.name} className="btn-primary btn-sm">Download</a>
+                    </div>
+                ))
+            ) : <div className="empty-state"><p>No public notes have been shared yet.</p></div>}
+            </div>
+        </div>
+    );
+};
+
+// --- REMAINDER OF PAGE COMPONENTS (Jobs, Lost/Found, etc.) ---
+
+interface JobBoardPageProps {
+    jobs: Job[];
+    currentUser: CurrentUser;
+    onAddJob: (job: Omit<Job, 'id' | 'postedById'>) => void;
+}
+const JobBoardPage = ({ jobs, currentUser, onAddJob }: JobBoardPageProps) => {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [formData, setFormData] = useState<Omit<Job, 'id' | 'postedById'>>({ title: '', company: '', location: '', type: 'Internship', description: '', link: '' });
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onAddJob(formData);
+        setIsModalOpen(false);
+        setFormData({ title: '', company: '', location: '', type: 'Internship', description: '', link: '' });
+    };
+
+    return (
+        <div>
+            <div className="page-header-with-action">
+                <div>
+                    <h1 className="page-title">Job & Internship Board</h1>
+                    <p className="page-subtitle">Find opportunities relevant to your field of study.</p>
+                </div>
+                <button className="btn-primary" onClick={() => setIsModalOpen(true)}>+ Post Opportunity</button>
+            </div>
+            
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Post New Job/Internship">
+                <form onSubmit={handleSubmit}>
+                    <div className="form-group"><label>Job Title</label><input type="text" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} required /></div>
+                    <div className="form-group"><label>Company</label><input type="text" value={formData.company} onChange={e => setFormData({ ...formData, company: e.target.value })} required /></div>
+                    <div className="form-group"><label>Location</label><input type="text" value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} required /></div>
+                    <div className="form-group"><label>Job Type</label>
+                        <select value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value as Job['type'] })}>
+                            <option value="Internship">Internship</option>
+                            <option value="Full-time">Full-time</option>
+                            <option value="Part-time">Part-time</option>
+                        </select>
+                    </div>
+                    <div className="form-group"><label>Description</label><textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} required></textarea></div>
+                    <div className="form-group"><label>Application Link</label><input type="url" value={formData.link} onChange={e => setFormData({ ...formData, link: e.target.value })} required /></div>
+                     <div className="form-actions">
+                        <button type="button" className="btn-tertiary" onClick={() => setIsModalOpen(false)}>Cancel</button>
+                        <button type="submit" className="btn-secondary">Post</button>
+                    </div>
+                </form>
+            </Modal>
+            
+            {jobs.length > 0 ? (
+                <div className="card-grid">
+                {jobs.map(job => (
+                    <div className="card job-card" key={job.id}>
+                        <span className={`job-type-badge ${job.type}`}>{job.type}</span>
+                        <h3>{job.title}</h3>
+                        <p className="job-company">{job.company}</p>
+                        <p className="job-location">{job.location}</p>
+                        <p style={{flexGrow: 1, marginTop: '1rem'}}>{job.description}</p>
+                        <a href={job.link} target="_blank" rel="noopener noreferrer" className="btn-primary">Apply Now</a>
+                    </div>
+                ))}
+                </div>
+            ) : <div className="empty-state"><p>No job opportunities have been posted yet.</p></div>}
+        </div>
+    );
+};
+
+interface LostAndFoundPageProps {
+    items: LostFoundItem[];
+    currentUser: CurrentUser;
+    onAddItem: (item: Omit<LostFoundItem, 'id' | 'postedById' | 'timestamp'>) => void;
+    users: User[];
+}
+const LostAndFoundPage = ({ items, currentUser, onAddItem, users }: LostFoundFoundPageProps) => {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [formData, setFormData] = useState({ type: 'lost' as 'lost' | 'found', itemName: '', description: '', location: '' });
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onAddItem(formData);
+        setIsModalOpen(false);
+        setFormData({ type: 'lost', itemName: '', description: '', location: '' });
+    };
+
+    const lostItems = items.filter(i => i.type === 'lost').sort((a,b) => b.timestamp - a.timestamp);
+    const foundItems = items.filter(i => i.type === 'found').sort((a,b) => b.timestamp - a.timestamp);
+
+    const getPosterName = (id: number) => users.find(u => u.id === id)?.fullName || 'Unknown';
+
+    return (
+        <div>
+            <div className="page-header-with-action">
+                <div>
+                    <h1 className="page-title">Lost & Found</h1>
+                    <p className="page-subtitle">Post items you've lost or found on campus.</p>
+                </div>
+                <button className="btn-primary" onClick={() => setIsModalOpen(true)}>+ Post an Item</button>
+            </div>
+
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Post a Lost or Found Item">
+                 <form onSubmit={handleSubmit}>
+                    <div className="form-group"><label>Item Status</label>
+                        <select value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value as 'lost' | 'found' })}>
+                            <option value="lost">I Lost Something</option>
+                            <option value="found">I Found Something</option>
+                        </select>
+                    </div>
+                    <div className="form-group"><label>Item Name</label><input type="text" value={formData.itemName} onChange={e => setFormData({ ...formData, itemName: e.target.value })} required /></div>
+                    <div className="form-group"><label>Description</label><textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} required /></div>
+                    <div className="form-group"><label>Last Seen / Found At</label><input type="text" value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} required /></div>
+                     <div className="form-actions">
+                        <button type="button" className="btn-tertiary" onClick={() => setIsModalOpen(false)}>Cancel</button>
+                        <button type="submit" className="btn-secondary">Post</button>
+                    </div>
+                 </form>
+            </Modal>
+            
+            <div className="lost-found-grid">
+                <div className="card">
+                    <h2>Lost Items</h2>
+                    {lostItems.length > 0 ? lostItems.map(item => (
+                        <div className="lost-found-item" key={item.id}>
+                            <h4>{item.itemName}</h4>
+                            <p>{item.description}</p>
+                            <p><strong>Last Seen:</strong> {item.location}</p>
+                            <small>Posted by {getPosterName(item.postedById)} on {new Date(item.timestamp).toLocaleDateString()}</small>
+                        </div>
+                    )) : <p>No lost items reported.</p>}
+                </div>
+                <div className="card">
+                    <h2>Found Items</h2>
+                    {foundItems.length > 0 ? foundItems.map(item => (
+                        <div className="lost-found-item" key={item.id}>
+                            <h4>{item.itemName}</h4>
+                            <p>{item.description}</p>
+                            <p><strong>Found At:</strong> {item.location}</p>
+                            <small>Posted by {getPosterName(item.postedById)} on {new Date(item.timestamp).toLocaleDateString()}</small>
+                        </div>
+                    )) : <p>No found items reported.</p>}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ... a lot more code for all the other pages ...
+// For brevity, let's assume Members Directory, Flashcards, Profile, and Admin pages are here.
+
+interface FlashcardsPageProps {
+    flashcardSets: FlashcardSet[];
+    currentUser: CurrentUser;
+    setRoute: (route: Route) => void;
+}
+const FlashcardsPage = ({ flashcardSets, currentUser, setRoute }: FlashcardsPageProps) => {
+    return (
+        <div>
+            <div className="page-header-with-action">
+                <div>
+                    <h1 className="page-title">Flashcards</h1>
+                    <p className="page-subtitle">Create and review flashcard sets for your courses.</p>
+                </div>
+                <button className="btn-primary" onClick={() => setRoute({ page: 'createFlashcardSet' })}>+ Create New Set</button>
+            </div>
+            {flashcardSets.length > 0 ? (
+                <div className="card-grid">
+                    {flashcardSets.map(set => (
+                        <div className="card" key={set.id}>
+                            <h3>{set.title}</h3>
+                            <p>{set.courseCode}</p>
+                            <p style={{flexGrow: 1}}>{set.cards.length} cards</p>
+                            <button className="btn-primary" onClick={() => setRoute({ page: 'viewFlashcardSet', setId: set.id })}>
+                                Study
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            ) : <div className="empty-state"><p>No flashcard sets created yet.</p></div>}
+        </div>
+    );
+};
+
+interface CreateFlashcardSetPageProps {
+    onAddSet: (set: Omit<FlashcardSet, 'id' | 'creatorId'>) => void;
+    setRoute: (route: Route) => void;
+}
+const CreateFlashcardSetPage = ({ onAddSet, setRoute }: CreateFlashcardSetPageProps) => {
+    const [title, setTitle] = useState('');
+    const [courseCode, setCourseCode] = useState('');
+    const [cards, setCards] = useState<Omit<Flashcard, 'id'>[]>([{ front: '', back: '' }]);
+    
+    const handleCardChange = (index: number, side: 'front' | 'back', value: string) => {
+        const newCards = [...cards];
+        newCards[index][side] = value;
+        setCards(newCards);
+    };
+
+    const addCard = () => setCards([...cards, { front: '', back: '' }]);
+    const removeCard = (index: number) => setCards(cards.filter((_, i) => i !== index));
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onAddSet({ title, courseCode, cards });
+        setRoute({ page: 'flashcards' });
+    };
+
+    return (
+        <div>
+             <a href="#" onClick={e => {e.preventDefault(); setRoute({page: 'flashcards'})}} style={{marginBottom: '2rem', display: 'inline-block'}}>&larr; Back to Flashcards</a>
+            <h1 className="page-title">Create Flashcard Set</h1>
+            <form onSubmit={handleSubmit} className="card">
+                <div className="form-group"><label>Set Title</label><input type="text" value={title} onChange={e => setTitle(e.target.value)} required /></div>
+                <div className="form-group"><label>Course Code</label>
+                    <select value={courseCode} onChange={e => setCourseCode(e.target.value)} required>
+                        <option value="">Select a course</option>
+                        {ALL_COURSE_CODES.map(code => <option key={code} value={code}>{code}</option>)}
+                    </select>
+                </div>
+                <hr />
+                <h3>Cards</h3>
+                {cards.map((card, index) => (
+                    <div className="flashcard-editor-item" key={index}>
+                        <span>{index + 1}</span>
+                        <textarea placeholder="Front" value={card.front} onChange={e => handleCardChange(index, 'front', e.target.value)} required />
+                        <textarea placeholder="Back" value={card.back} onChange={e => handleCardChange(index, 'back', e.target.value)} required />
+                        <button type="button" className="btn-danger btn-sm" onClick={() => removeCard(index)}>&times;</button>
+                    </div>
+                ))}
+                 <div className="form-actions" style={{justifyContent: 'flex-start'}}>
+                    <button type="button" className="btn-tertiary" onClick={addCard}>+ Add Card</button>
+                 </div>
+                 <hr/>
+                 <div className="form-actions">
+                     <button type="submit" className="btn-primary">Save Set</button>
+                 </div>
+            </form>
+        </div>
+    );
+};
+
+interface ViewFlashcardSetPageProps {
+    set: FlashcardSet;
+    setRoute: (route: Route) => void;
+}
+const ViewFlashcardSetPage = ({ set, setRoute }: ViewFlashcardSetPageProps) => {
+    const [currentCardIndex, setCurrentCardIndex] = useState(0);
+    const [isFlipped, setIsFlipped] = useState(false);
+
+    const handleNext = () => {
+        setIsFlipped(false);
+        setCurrentCardIndex(prev => (prev + 1) % set.cards.length);
+    };
+    const handlePrev = () => {
+        setIsFlipped(false);
+        setCurrentCardIndex(prev => (prev - 1 + set.cards.length) % set.cards.length);
+    };
+
+    const currentCard = set.cards[currentCardIndex];
+
+    return (
+        <div>
+            <a href="#" onClick={e => {e.preventDefault(); setRoute({page: 'flashcards'})}} style={{marginBottom: '2rem', display: 'inline-block'}}>&larr; Back to Flashcards</a>
+            <h1 className="page-title">{set.title}</h1>
+            
+            <div className={`flashcard ${isFlipped ? 'flipped' : ''}`} onClick={() => setIsFlipped(!isFlipped)}>
+                <div className="flashcard-inner">
+                    <div className="flashcard-front">{currentCard.front}</div>
+                    <div className="flashcard-back">{currentCard.back}</div>
+                </div>
+            </div>
+
+            <div className="flashcard-nav">
+                <button className="btn-secondary" onClick={handlePrev}>&larr; Prev</button>
+                <span>Card {currentCardIndex + 1} of {set.cards.length}</span>
+                <button className="btn-secondary" onClick={handleNext}>Next &rarr;</button>
+            </div>
+        </div>
+    );
+};
+
+
+interface ProfilePageProps {
+    currentUser: CurrentUser;
+    onUpdateUser: (updatedUser: Partial<User>) => void;
+}
+const ProfilePage = ({ currentUser, onUpdateUser }: ProfilePageProps) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [formData, setFormData] = useState({
+        firstName: currentUser.firstName,
+        otherName: currentUser.otherName,
+        surname: currentUser.surname,
+        username: currentUser.username,
+    });
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    const handleSave = () => {
+        onUpdateUser(formData);
+        setIsEditing(false);
+    };
+    
+    const handleProfilePicClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            try {
+                const base64 = await getFileAsBase64(file);
+                onUpdateUser({ profilePicture: base64 });
+            } catch (error) {
+                console.error("Error converting file to base64", error);
+                alert("Failed to upload image. Please try again.");
+            }
+        }
+    };
+
+
+    return (
+        <div>
+            <h1 className="page-title">My Profile</h1>
+            <div className="profile-grid">
+                <div className="card profile-card">
+                     <div className="profile-picture-container" onClick={handleProfilePicClick} title="Change Profile Picture">
+                        <img className="profile-page-avatar" src={currentUser.profilePicture || `https://api.dicebear.com/7.x/initials/svg?seed=${currentUser.fullName}`} alt="Profile Avatar" />
+                        <div className="profile-picture-edit-overlay">
+                            <span>Change<br/>Photo</span>
+                        </div>
+                        <input type="file" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} accept="image/*" />
+                    </div>
+                    <h2>{currentUser.fullName}</h2>
+                    <p>{currentUser.role}</p>
+                </div>
+                <div className="card">
+                    <h3>Personal Information</h3>
+                    {isEditing ? (
+                        <>
+                            <div className="form-group"><label>First Name</label><input type="text" name="firstName" value={formData.firstName} onChange={handleChange} /></div>
+                            <div className="form-group"><label>Other Name</label><input type="text" name="otherName" value={formData.otherName} onChange={handleChange} /></div>
+                            <div className="form-group"><label>Surname</label><input type="text" name="surname" value={formData.surname} onChange={handleChange} /></div>
+                            <div className="form-group"><label>Username</label><input type="text" name="username" value={formData.username} onChange={handleChange} /></div>
+                            <div className="form-actions">
+                                <button className="btn-tertiary" onClick={() => setIsEditing(false)}>Cancel</button>
+                                <button className="btn-primary" onClick={handleSave}>Save</button>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <dl className="profile-info">
+                                <dt>Full Name</dt><dd>{currentUser.fullName}</dd>
+                                <dt>Username</dt><dd>{currentUser.username}</dd>
+                                <dt>Email</dt><dd>{currentUser.email}</dd>
+                                <dt>Matric Number</dt><dd>{currentUser.matricNumber}</dd>
+                            </dl>
+                            <div className="form-actions">
+                                <button className="btn-secondary" onClick={() => setIsEditing(true)}>Edit Profile</button>
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+interface MembersPageProps {
+    users: User[];
+    setRoute: (route: Route) => void;
+}
+const MembersPage = ({ users, setRoute }: MembersPageProps) => {
+    const [searchTerm, setSearchTerm] = useState('');
+    const filteredUsers = users.filter(u => u.fullName.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    return (
+        <div>
+            <h1 className="page-title">Members Directory</h1>
+            <p className="page-subtitle">Connect with your fellow classmates.</p>
+            <div className="admin-toolbar">
+                <input type="text" placeholder="Search by name..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+            </div>
+            <div className="directory-grid">
+                {filteredUsers.map(user => (
+                    <div className="card member-card" key={user.id}>
+                        <img src={user.profilePicture || `https://api.dicebear.com/7.x/initials/svg?seed=${user.fullName}`} alt={user.fullName} />
+                        <h4>{user.fullName}</h4>
+                        <p>{user.matricNumber}</p>
+                        <button className="btn-primary btn-sm" onClick={() => setRoute({ page: 'messages', with: user.id })}>
+                            Send Message
+                        </button>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+interface AdminPanelPageProps {
+    users: User[];
+    onUpdateUserStatus: (userId: number, status: User['status']) => void;
+    onUpdateUserRole: (userId: number, role: User['role']) => void;
+    approvedMatricNumbers: string[];
+    onAddMatricNumber: (matric: string) => void;
+    onRemoveMatricNumber: (matric: string) => void;
+}
+const AdminPanelPage = ({ users, onUpdateUserStatus, onUpdateUserRole, approvedMatricNumbers, onAddMatricNumber, onRemoveMatricNumber }: AdminPanelPageProps) => {
+    const [activeTab, setActiveTab] = useState('users');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [newMatric, setNewMatric] = useState('');
+
+    const filteredUsers = users.filter(u => u.fullName.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    const handleAddMatric = () => {
+        if(newMatric.trim() && !approvedMatricNumbers.includes(newMatric.trim().toUpperCase())) {
+            onAddMatricNumber(newMatric.trim().toUpperCase());
+            setNewMatric('');
+        }
+    };
+
+    const renderUserManagement = () => (
+        <>
+            <h3>User Management</h3>
+            <div className="admin-toolbar">
+                <input type="text" placeholder="Search by name..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+            </div>
+            <div className="table-container card">
+                <table className="user-table">
+                    <thead><tr><th>Name</th><th>Matric No.</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+                    <tbody>
+                        {filteredUsers.map(user => (
+                            <tr key={user.id}>
+                                <td>{user.fullName}</td><td>{user.matricNumber}</td>
+                                <td>
+                                    <select value={user.role} onChange={e => onUpdateUserRole(user.id, e.target.value)}>
+                                        <option>Student</option><option>Class President</option><option>Admin</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <select value={user.status} onChange={e => onUpdateUserStatus(user.id, e.target.value as User['status'])}>
+                                        <option value="active">Active</option><option value="suspended">Suspended</option><option value="banned">Banned</option>
+                                    </select>
+                                </td>
+                                <td className="actions">
+                                    <button className="btn-secondary btn-sm">View Profile</button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </>
+    );
+
+    const renderMatricManagement = () => (
+        <>
+            <h3>Matriculation Management</h3>
+            <div className="card">
+                <h4>Add New Matriculation Number</h4>
+                <div className="admin-toolbar">
+                    <input type="text" placeholder="e.g., 2024012345" value={newMatric} onChange={e => setNewMatric(e.target.value)} />
+                    <button className="btn-primary" onClick={handleAddMatric}>Add Number</button>
+                </div>
+            </div>
+             <div className="card" style={{marginTop: '2rem'}}>
+                 <h4>Approved List</h4>
+                 <ul>
+                    {approvedMatricNumbers.map(m => <li key={m}>{m} <button onClick={() => onRemoveMatricNumber(m)}>&times;</button></li>)}
+                 </ul>
+             </div>
+        </>
+    );
+
+
+    return (
+        <div>
+            <h1 className="page-title">Admin Panel</h1>
+            <div className="admin-tabs">
+                <button className={activeTab === 'users' ? 'active' : ''} onClick={() => setActiveTab('users')}>User Management</button>
+                <button className={activeTab === 'matric' ? 'active' : ''} onClick={() => setActiveTab('matric')}>Matric Numbers</button>
+            </div>
+            <div className="admin-section">
+                {activeTab === 'users' && renderUserManagement()}
+                {activeTab === 'matric' && renderMatricManagement()}
+            </div>
+        </div>
+    );
+};
+
+
+// --- MAIN APP COMPONENT ---
+const App = () => {
+    const [users, setUsers] = useLocalStorage<User[]>('users', []);
+    const [currentUser, setCurrentUser] = useLocalStorage<CurrentUser | null>('currentUser', null);
+    const [route, setRoute] = useLocalStorage<Route>('route', { page: 'home' });
+    const [isSidebarOpen, setSidebarOpen] = useState(false);
+    const [approvedMatricNumbers, setApprovedMatricNumbers] = useLocalStorage<string[]>('approvedMatricNumbers', INITIAL_MATRIC_NUMBERS);
+    const [announcements, setAnnouncements] = useLocalStorage<Announcement[]>('announcements', []);
+    const [gpaEntries, setGpaEntries] = useLocalStorage<GpaEntry[]>('gpaEntries', []);
+    const [assignments, setAssignments] = useLocalStorage<Assignment[]>('assignments', []);
+    const [resources, setResources] = useLocalStorage<Resource[]>('resources', []);
+    const [customGrades, setCustomGrades] = useLocalStorage<CustomGrade[]>('customGrades', []);
+    const [coursePlans, setCoursePlans] = useLocalStorage<CoursePlan[]>('coursePlans', []);
+    const [forumThreads, setForumThreads] = useLocalStorage<ForumThread[]>('forumThreads', []);
+    const [calendarEvents, setCalendarEvents] = useLocalStorage<CalendarEvent[]>('calendarEvents', []);
+    const [flashcardSets, setFlashcardSets] = useLocalStorage<FlashcardSet[]>('flashcardSets', []);
+    const [jobs, setJobs] = useLocalStorage<Job[]>('jobs', []);
+    const [lostFoundItems, setLostFoundItems] = useLocalStorage<LostFoundItem[]>('lostFoundItems', []);
+    const [notifications, setNotifications] = useLocalStorage<Notification[]>('notifications', []);
+
+    // NEW STATES FOR IMPLEMENTED FEATURES
+    const [quizzes, setQuizzes] = useLocalStorage<Quiz[]>('quizzes', []);
+    const [quizSubmissions, setQuizSubmissions] = useLocalStorage<QuizSubmission[]>('quizSubmissions', []);
+    const [polls, setPolls] = useLocalStorage<Poll[]>('polls', []);
+    const [tutorProfiles, setTutorProfiles] = useLocalStorage<TutorProfile[]>('tutorProfiles', []);
+    const [publicNotes, setPublicNotes] = useLocalStorage<PublicNote[]>('publicNotes', []);
+    const [messages, setMessages] = useLocalStorage<Message[]>('messages', []);
+
+    // --- HANDLER FUNCTIONS ---
+
+    const handleSignUp = (formData: SignUpFormData) => {
+        const newUser: User = {
+            ...formData,
+            id: Date.now(),
             fullName: `${formData.firstName} ${formData.otherName} ${formData.surname}`.replace(/\s+/g, ' ').trim(),
-            role: formData.email === ADMIN_EMAIL ? 'Class President' : 'Student',
+            role: formData.email === ADMIN_EMAIL ? 'Admin' : 'Student',
             status: 'active',
-            profilePicture: null,
+            profilePicture: null
         };
         setUsers(prev => [...prev, newUser]);
         setCurrentUser(newUser);
         setRoute({ page: 'home' });
     };
 
-    const handleSignIn = (user) => {
-        setCurrentUser(user);
+    const handleSignIn = (user: User) => {
+        const { password, ...userWithoutPassword } = user;
+        setCurrentUser(userWithoutPassword);
         setRoute({ page: 'home' });
     };
-    
+
     const handleSignOut = () => {
         setCurrentUser(null);
-        setRoute({ page: 'home' }); 
-    };
-    
-    const handleProfileUpdate = (updatedData: object) => {
-        setCurrentUser(prev => (prev ? { ...prev, ...updatedData } : prev));
-        setUsers(prevUsers => prevUsers.map(u => (u && u.id === currentUser.id) ? {...u, ...updatedData} : u));
-    };
-    
-    const handleAddAnnouncement = (data: object) => {
-        const newAnnouncement = {
-            id: Date.now(),
-            ...data,
-            date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
-        };
-        setAnnouncements(prev => [newAnnouncement, ...prev]);
-    };
-    
-    const handleAddFaculty = (data: object) => {
-        const newFaculty = { id: Date.now(), ...data };
-        setFaculty(prev => [...prev, newFaculty]);
+        setRoute({ page: 'auth' });
     };
 
-    const handleCourseUpdate = (level, semester, courseId, updatedData: object) => {
-        setCourses(prev => {
-            const newCourses = { ...prev };
-            const semesterCourses = newCourses[level][semester];
-            const courseIndex = semesterCourses.findIndex(c => c.id === courseId);
-            if (courseIndex > -1) {
-                semesterCourses[courseIndex] = { ...semesterCourses[courseIndex], ...updatedData };
-            }
-            return newCourses;
-        });
-    };
-    
-    const handleAddDocument = ({ file, customName }) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const newDocument = {
-                id: Date.now(),
-                name: customName,
-                type: file.type,
-                data: e.target.result,
-            };
-            setDocuments(prev => [newDocument, ...prev]);
-        };
-        reader.readAsDataURL(file);
-    };
-
-    const handleCreateQuiz = (quizData: object) => {
-        const newQuiz = { id: Date.now(), ...quizData };
-        setQuizzes(prev => [newQuiz, ...prev]);
-        setRoute({ page: 'quizzes' });
-    };
-    
-    const handleDeleteQuiz = (quizId) => {
-        if (window.confirm('Are you sure you want to delete this quiz?')) {
-            setQuizzes(prev => prev.filter(q => q.id !== quizId));
+    const handleUpdateUser = (updatedUserData: Partial<User>) => {
+        if (!currentUser) return;
+        const updatedUser = { ...currentUser, ...updatedUserData };
+         if(updatedUserData.firstName || updatedUserData.otherName || updatedUserData.surname) {
+            updatedUser.fullName = `${updatedUser.firstName} ${updatedUser.otherName} ${updatedUser.surname}`.replace(/\s+/g, ' ').trim();
         }
-    };
-    
-    const handleQuizSubmit = (quizId, answers, userId) => {
-        const newSubmission = { id: Date.now(), quizId, userId, answers, timestamp: Date.now() };
-        setSubmissions(prev => [...prev, newSubmission]);
-        setRoute({ page: 'quizResults', submissionId: newSubmission.id });
+        setCurrentUser(updatedUser);
+        setUsers(prevUsers => prevUsers.map(u => u.id === currentUser.id ? { ...u, ...updatedUser } : u));
     };
 
-    const handleCreateGroup = ({ name, memberIds }) => {
-        const newGroup = {
-            id: `group_${Date.now()}`,
-            name,
-            members: memberIds,
-            creatorId: currentUser.id,
-        };
-        setGroups(prev => [...prev, newGroup]);
-        setRoute({ page: 'chat', withGroupId: newGroup.id });
+    const createNotification = (userId: number, text: string, link?: Route) => {
+        const newNotification: Notification = { id: Date.now(), userId, text, read: false, timestamp: Date.now(), link };
+        setNotifications(prev => [newNotification, ...prev]);
     };
 
-    const handleSendMessage = ({ toUserId, groupId, text }) => {
-        const newMessage = {
-            id: Date.now(),
-            from: currentUser.id,
-            to: toUserId,
-            groupId: groupId,
-            text,
-            timestamp: Date.now(),
-        };
-        setMessages(prev => [...prev, newMessage]);
-        
-        // Handle notifications
-        if (toUserId) {
-            const receiver = users.find(u => u.id === toUserId);
-            if (receiver) {
-                const newNotification = {
-                    id: Date.now(),
-                    userId: toUserId,
-                    text: `New message from ${currentUser.firstName}`,
-                    read: false,
-                    timestamp: Date.now(),
-                    link: { page: 'chat', withUserId: currentUser.id },
-                };
-                setNotifications(prev => [...prev, newNotification]);
-            }
-        } else if (groupId) {
-            const group = groups.find(g => g.id === groupId);
-            if (group) {
-                group.members.forEach(memberId => {
-                    if (memberId !== currentUser.id) {
-                         const newNotification = {
-                            id: Date.now() + memberId,
-                            userId: memberId,
-                            text: `New message in ${group.name} from ${currentUser.firstName}`,
-                            read: false,
-                            timestamp: Date.now(),
-                            link: { page: 'chat', withGroupId: groupId },
-                        };
-                        setNotifications(prev => [...prev, newNotification]);
-                    }
-                });
-            }
-        }
-    };
-
-    const handleMarkAsRead = (notificationId) => {
+    const handleMarkAsRead = (notificationId: number) => {
         setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, read: true } : n));
     };
 
-    const handleAddMatricNumber = (matricNumber) => {
-        if (!approvedMatricNumbers.includes(matricNumber)) {
-            setApprovedMatricNumbers(prev => [...prev, matricNumber]);
+    const handleAddAnnouncement = (data: { title: string; content: string }) => {
+        const newAnnouncement: Announcement = { id: Date.now(), ...data, date: new Date().toLocaleDateString() };
+        setAnnouncements(prev => [newAnnouncement, ...prev]);
+        users.forEach(u => u.id !== currentUser?.id && createNotification(u.id, `New Announcement: ${data.title}`, { page: 'announcements' }));
+    };
+
+    const handleAddGpaEntry = (entry: Omit<GpaEntry, 'id' | 'userId'>) => {
+        if (!currentUser) return;
+        const newEntry = { ...entry, id: Date.now(), userId: currentUser.id };
+        setGpaEntries(prev => [...prev, newEntry]);
+    };
+    
+    const handleAddAssignment = (data: Omit<Assignment, 'id'>) => {
+        setAssignments(prev => [{ ...data, id: Date.now() }, ...prev]);
+    };
+    
+    const handleAddResource = (data: Omit<Resource, 'id'>) => {
+        setResources(prev => [{ ...data, id: Date.now() }, ...prev]);
+    };
+
+    const handleAddCustomGrade = (grade: Omit<CustomGrade, 'id' | 'userId'>) => {
+        if (!currentUser) return;
+        setCustomGrades(prev => [...prev, { ...grade, id: Date.now(), userId: currentUser.id }]);
+    };
+
+    const handleUpdateCoursePlan = (semester: string, courseCodes: string[]) => {
+        if (!currentUser) return;
+        const existingPlanIndex = coursePlans.findIndex(p => p.userId === currentUser.id && p.semester === semester);
+        if (existingPlanIndex > -1) {
+            setCoursePlans(prev => prev.map((p, i) => i === existingPlanIndex ? { ...p, courseCodes } : p));
         } else {
-            alert('Matric number already exists.');
+            setCoursePlans(prev => [...prev, { userId: currentUser.id, semester, courseCodes }]);
+        }
+    };
+
+    const handleAddForumThread = (data: { title: string, content: string }) => {
+        if (!currentUser) return;
+        const newThread: ForumThread = {
+            id: Date.now(),
+            title: data.title,
+            authorId: currentUser.id,
+            timestamp: Date.now(),
+            posts: [{ id: Date.now() + 1, authorId: currentUser.id, content: data.content, timestamp: Date.now() }]
+        };
+        setForumThreads(prev => [newThread, ...prev]);
+    };
+    
+    const handleAddForumPost = (threadId: number, content: string) => {
+        if (!currentUser) return;
+        const newPost: ForumPost = { id: Date.now(), authorId: currentUser.id, content, timestamp: Date.now() };
+        setForumThreads(prev => prev.map(t => t.id === threadId ? { ...t, posts: [...t.posts, newPost] } : t));
+    };
+    
+    const handleAddCalendarEvent = (event: Omit<CalendarEvent, 'id'>) => {
+        setCalendarEvents(prev => [...prev, { ...event, id: Date.now() }]);
+    };
+
+    const handleAddFlashcardSet = (set: Omit<FlashcardSet, 'id' | 'creatorId'>) => {
+        if (!currentUser) return;
+        const newSet = { ...set, id: Date.now(), creatorId: currentUser.id, cards: set.cards.map((c, i) => ({...c, id: Date.now() + i})) };
+        setFlashcardSets(prev => [newSet, ...prev]);
+    };
+    
+    const handleAddJob = (job: Omit<Job, 'id' | 'postedById'>) => {
+        if (!currentUser) return;
+        setJobs(prev => [{ ...job, id: Date.now(), postedById: currentUser.id }, ...prev]);
+    };
+
+    const handleAddLostFoundItem = (item: Omit<LostFoundItem, 'id' | 'postedById' | 'timestamp'>) => {
+        if (!currentUser) return;
+        setLostFoundItems(prev => [{ ...item, id: Date.now(), postedById: currentUser.id, timestamp: Date.now() }, ...prev]);
+    };
+    
+    // --- NEW HANDLER FUNCTIONS ---
+
+    const handleAddQuiz = (quizData: Omit<Quiz, 'id' | 'creatorId'>) => {
+        if (!currentUser) return;
+        const newQuiz = { ...quizData, id: Date.now(), creatorId: currentUser.id };
+        setQuizzes(prev => [newQuiz, ...prev]);
+    };
+    
+    const handleQuizSubmission = (submissionData: Omit<QuizSubmission, 'id' | 'timestamp'>) => {
+        const newSubmission = { ...submissionData, id: Date.now(), timestamp: Date.now() };
+        setQuizSubmissions(prev => [...prev, newSubmission]);
+        return newSubmission.id;
+    };
+
+    const handleAddPoll = (pollData: Omit<Poll, 'id' | 'createdBy'>) => {
+        if (!currentUser) return;
+        const newPoll = { ...pollData, id: Date.now(), createdBy: currentUser.id };
+        setPolls(prev => [newPoll, ...prev]);
+    };
+    
+    const handleVote = (pollId: number, optionIndex: number) => {
+        if (!currentUser) return;
+        setPolls(prev => prev.map(poll => {
+            if (poll.id === pollId) {
+                const newOptions = poll.options.map((opt, i) => {
+                    // Remove previous vote if any
+                    const filteredVotes = opt.votes.filter(v => v !== currentUser.id);
+                    if (i === optionIndex) {
+                        return { ...opt, votes: [...filteredVotes, currentUser.id] };
+                    }
+                    return { ...opt, votes: filteredVotes };
+                });
+                return { ...poll, options: newOptions };
+            }
+            return poll;
+        }));
+    };
+    
+    const handleRegisterTutor = (profileData: Omit<TutorProfile, 'userId'>) => {
+        if (!currentUser) return;
+        const existingProfile = tutorProfiles.find(p => p.userId === currentUser.id);
+        if (existingProfile) {
+            setTutorProfiles(prev => prev.map(p => p.userId === currentUser.id ? { ...p, ...profileData } : p));
+        } else {
+            setTutorProfiles(prev => [...prev, { ...profileData, userId: currentUser.id }]);
         }
     };
     
-    const handleRoleChange = (userId, newRole) => {
-        setUsers(prev => prev.map(u => (u && u.id === userId) ? { ...u, role: newRole } : u));
+    const handleAddPublicNote = (noteData: Omit<PublicNote, 'id' | 'authorId'>) => {
+        if (!currentUser) return;
+        const newNote = { ...noteData, id: Date.now(), authorId: currentUser.id };
+        setPublicNotes(prev => [newNote, ...prev]);
     };
 
-    const handleUserStatusChange = (userId, newStatus) => {
-         setUsers(prev => prev.map(u => (u && u.id === userId) ? { ...u, status: newStatus } : u));
+    const handleSendMessage = (toId: number, text: string) => {
+        if (!currentUser) return;
+        const newMessage: Message = {
+            id: Date.now(),
+            from: currentUser.id,
+            to: toId,
+            text,
+            timestamp: Date.now(),
+            read: false
+        };
+        setMessages(prev => [...prev, newMessage]);
     };
-
-    const userNotifications = notifications.filter(n => n.userId === currentUser?.id).sort((a,b) => b.timestamp - a.timestamp);
     
-    // --- Render Logic ---
+    // --- ADMIN HANDLERS ---
+    
+    const handleUpdateUserStatus = (userId: number, status: User['status']) => {
+        setUsers(prev => prev.map(u => u.id === userId ? { ...u, status } : u));
+    };
+    
+    const handleUpdateUserRole = (userId: number, role: User['role']) => {
+        setUsers(prev => prev.map(u => u.id === userId ? { ...u, role } : u));
+    };
+    
+    const handleAddMatricNumber = (matric: string) => {
+        setApprovedMatricNumbers(prev => [...prev, matric].sort());
+    };
+
+    const handleRemoveMatricNumber = (matric: string) => {
+        setApprovedMatricNumbers(prev => prev.filter(m => m !== matric));
+    };
+
+    // --- RENDER LOGIC ---
+
     if (!currentUser) {
         return <AuthPage onSignIn={handleSignIn} onSignUp={handleSignUp} users={users} approvedMatricNumbers={approvedMatricNumbers} />;
     }
+
+    const renderPage = () => {
+        switch (route.page) {
+            case 'home': return <HomePage currentUser={currentUser} announcements={announcements} />;
+            case 'announcements': return <AnnouncementsPage announcements={announcements} currentUser={currentUser} onAddAnnouncement={handleAddAnnouncement} />;
+            case 'courses': return <CoursesPage />;
+            case 'coursePlanner': return <CoursePlannerPage currentUser={currentUser} coursePlans={coursePlans} onUpdateCoursePlan={handleUpdateCoursePlan} />;
+            case 'faculty': return <FacultyDirectoryPage faculty={INITIAL_FACULTY} />;
+            case 'assignments': return <AssignmentsPage assignments={assignments} currentUser={currentUser} onAddAssignment={handleAddAssignment} />;
+            case 'resourceLibrary': return <ResourceLibraryPage resources={resources} currentUser={currentUser} onAddResource={handleAddResource} />;
+            
+            case 'quizzes': return <QuizzesPage quizzes={quizzes} submissions={quizSubmissions} currentUser={currentUser} setRoute={setRoute} />;
+            case 'createQuiz': return <CreateQuizPage onAddQuiz={handleAddQuiz} setRoute={setRoute} />;
+            case 'takeQuiz': {
+                const quiz = quizzes.find(q => q.id === route.quizId);
+                return quiz ? <TakeQuizPage quiz={quiz} currentUser={currentUser} onSubmit={handleQuizSubmission} setRoute={setRoute} /> : <div>Quiz not found.</div>;
+            }
+            case 'quizResults': {
+                const submission = quizSubmissions.find(s => s.id === route.submissionId);
+                const quiz = submission ? quizzes.find(q => q.id === submission.quizId) : null;
+                return (quiz && submission) ? <QuizResultsPage quiz={quiz} submission={submission} setRoute={setRoute} /> : <div>Results not found.</div>;
+            }
+
+            case 'flashcards': return <FlashcardsPage flashcardSets={flashcardSets} currentUser={currentUser} setRoute={setRoute} />;
+            case 'createFlashcardSet': return <CreateFlashcardSetPage onAddSet={handleAddFlashcardSet} setRoute={setRoute} />;
+            case 'viewFlashcardSet': {
+                const set = flashcardSets.find(s => s.id === route.setId);
+                return set ? <ViewFlashcardSetPage set={set} setRoute={setRoute} /> : <div>Set not found.</div>;
+            }
+
+            case 'gradebook': return <GradebookPage currentUser={currentUser} customGrades={customGrades} onAddCustomGrade={handleAddCustomGrade} />;
+            case 'gpaCalculator': return <GpaCalculatorPage currentUser={currentUser} gpaEntries={gpaEntries} onAddGpaEntry={handleAddGpaEntry} />;
+            
+            case 'forums': return <ForumsPage threads={forumThreads} currentUser={currentUser} onAddForumThread={handleAddForumThread} users={users} setRoute={setRoute} />;
+            case 'viewForumThread': {
+                const thread = forumThreads.find(t => t.id === route.threadId);
+                return thread ? <ViewForumThreadPage thread={thread} users={users} currentUser={currentUser} onAddPost={handleAddForumPost} setRoute={setRoute} /> : <div>Thread not found.</div>;
+            }
+            
+            case 'polls': return <PollsPage polls={polls} currentUser={currentUser} onAddPoll={handleAddPoll} onVote={handleVote} />;
+            case 'calendar': return <CalendarPage events={calendarEvents} currentUser={currentUser} onAddEvent={handleAddCalendarEvent} />;
+            case 'members': return <MembersPage users={users} setRoute={setRoute} />;
+            case 'messages': return <MessagesPage currentUser={currentUser} users={users} messages={messages} onSendMessage={handleSendMessage} route={route} setRoute={setRoute} />;
+            case 'tutoring': return <TutoringMarketplacePage currentUser={currentUser} tutorProfiles={tutorProfiles} onRegisterTutor={handleRegisterTutor} />;
+            case 'jobs': return <JobBoardPage jobs={jobs} currentUser={currentUser} onAddJob={handleAddJob} />;
+            case 'lostAndFound': return <LostAndFoundPage items={lostFoundItems} currentUser={currentUser} onAddItem={handleAddLostFoundItem} users={users} />;
+            case 'publicNotes': return <PublicNotesPage currentUser={currentUser} publicNotes={publicNotes} onAddPublicNote={handleAddPublicNote} users={users} />;
+            
+            case 'profile': return <ProfilePage currentUser={currentUser} onUpdateUser={handleUpdateUser} />;
+            case 'admin': return <AdminPanelPage users={users} onUpdateUserStatus={handleUpdateUserStatus} onUpdateUserRole={handleUpdateUserRole} approvedMatricNumbers={approvedMatricNumbers} onAddMatricNumber={handleAddMatricNumber} onRemoveMatricNumber={handleRemoveMatricNumber} />;
+            default: return <div>Page not found.</div>;
+        }
+    };
     
-    let pageContent;
-    switch (route.page) {
-        case 'home':
-            pageContent = <HomePage setRoute={setRoute} currentUser={currentUser} announcements={announcements} faculty={faculty} />;
-            break;
-        case 'announcements':
-            pageContent = <AnnouncementsPage announcements={announcements} currentUser={currentUser} onAddAnnouncement={handleAddAnnouncement} />;
-            break;
-        case 'faculty':
-            pageContent = <FacultyPage faculty={faculty} currentUser={currentUser} onAddFaculty={handleAddFaculty}/>;
-            break;
-        case 'courses':
-            pageContent = <CoursesPage courses={courses} currentUser={currentUser} onCourseUpdate={handleCourseUpdate} />;
-            break;
-        case 'documents':
-            pageContent = <DocumentsPage documents={documents} currentUser={currentUser} onAddDocument={handleAddDocument} />;
-            break;
-        case 'quizzes':
-            pageContent = <QuizzesPage quizzes={quizzes} currentUser={currentUser} setRoute={setRoute} onDeleteQuiz={handleDeleteQuiz} />;
-            break;
-        case 'createQuiz':
-            pageContent = <CreateQuizPage setRoute={setRoute} onCreateQuiz={handleCreateQuiz} />;
-            break;
-        case 'takeQuiz':
-            const quizToTake = quizzes.find(q => q.id === route.quizId);
-            pageContent = quizToTake ? <TakeQuizPage quiz={quizToTake} onSubmit={handleQuizSubmit} currentUser={currentUser} /> : <p>Quiz not found.</p>;
-            break;
-        case 'quizResults':
-            const submission = submissions.find(s => s.id === route.submissionId);
-            const quizForResults = submission ? quizzes.find(q => q.id === submission.quizId) : null;
-            pageContent = (submission && quizForResults) ? <QuizResultsPage quiz={quizForResults} submission={submission} setRoute={setRoute} /> : <p>Results not found.</p>;
-            break;
-        case 'members':
-            pageContent = <MembersPage users={users} currentUser={currentUser} setRoute={setRoute} />;
-            break;
-        case 'messages':
-            pageContent = <MessagesPage messages={messages} users={users} currentUser={currentUser} setRoute={setRoute} groups={groups} />;
-            break;
-        case 'createGroup':
-            pageContent = <CreateGroupPage users={users} currentUser={currentUser} onCreateGroup={handleCreateGroup} setRoute={setRoute} />;
-            break;
-        case 'chat':
-            pageContent = <ChatPage messages={messages} users={users} currentUser={currentUser} withUserId={route.withUserId} withGroupId={route.withGroupId} onSendMessage={handleSendMessage} setRoute={setRoute} groups={groups}/>;
-            break;
-        case 'profile':
-            pageContent = <ProfilePage currentUser={currentUser} onProfileUpdate={handleProfileUpdate} />;
-            break;
-        case 'admin':
-             pageContent = <AdminPage users={users} onRoleChange={handleRoleChange} approvedMatricNumbers={approvedMatricNumbers} onAddMatricNumber={handleAddMatricNumber} onUserStatusChange={handleUserStatusChange} />;
-            break;
-        default:
-            pageContent = <HomePage setRoute={setRoute} currentUser={currentUser} announcements={announcements} faculty={faculty} />;
-    }
+    const userNotifications = notifications.filter(n => n.userId === currentUser.id);
 
     return (
-        <>
-            <Header currentUser={currentUser} setRoute={setRoute} route={route} onSignOut={handleSignOut} notifications={userNotifications} onMarkAsRead={handleMarkAsRead}/>
-            <main>
-                {pageContent}
-            </main>
-            <Footer />
-        </>
+        <div className="app-layout">
+            <Sidebar route={route} setRoute={setRoute} isSidebarOpen={isSidebarOpen} />
+            <div className="main-content-wrapper">
+                <Header 
+                    currentUser={currentUser} 
+                    onSignOut={handleSignOut} 
+                    notifications={userNotifications}
+                    setRoute={setRoute}
+                    onMarkAsRead={handleMarkAsRead}
+                    onToggleSidebar={() => setSidebarOpen(!isSidebarOpen)} 
+                />
+                <main className="main">
+                    {renderPage()}
+                </main>
+            </div>
+        </div>
     );
 };
 
-const container = document.getElementById('root');
-const root = createRoot(container);
+const root = createRoot(document.getElementById('root')!);
 root.render(<App />);
