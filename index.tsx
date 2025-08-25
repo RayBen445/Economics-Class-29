@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
 
 // --- BASE TYPE DEFINITIONS ---
@@ -299,9 +299,6 @@ const INITIAL_FACULTY: Faculty[] = [
     { id: 3, name: "Mr. Chike Eze", title: "Lecturer I", email: "ceze@lautech.edu", office: "ECO-201", courses: ["ECO 201", "ECO 203"], profilePicture: "https://api.dicebear.com/7.x/adventurer/svg?seed=Chike" },
     { id: 4, name: "Mrs. Dolapo Otedola", title: "Lecturer II", email: "dotedola@lautech.edu", office: "ECO-205", courses: ["ECO 101", "ECO 102"], profilePicture: "https://api.dicebear.com/7.x/adventurer/svg?seed=Dolapo" },
 ];
-
-const ALL_COURSE_CODES = [...new Set(Object.values(INITIAL_COURSES_DATA).flatMap(s => Object.values(s).flat()).map(c => c.code))].sort();
-
 
 // --- HOOKS ---
 const useLocalStorage = <T,>(key: string, initialValue: T): [T, (value: T | ((val: T) => T)) => void] => {
@@ -745,35 +742,47 @@ const AnnouncementsPage = ({ announcements, currentUser, onAddAnnouncement }: An
 };
 
 // --- NEWLY IMPLEMENTED PAGE COMPONENTS ---
+interface CoursesPageProps {
+    coursesData: CoursesData;
+}
+const CoursesPage = ({ coursesData }: CoursesPageProps) => {
+    const [activeLevel, setActiveLevel] = useState("100 Level");
+    const levels = Object.keys(coursesData);
+    const activeSemesters = coursesData[activeLevel] || {};
 
-const CoursesPage = () => {
     return (
         <div>
             <h1 className="page-title">Courses</h1>
             <p className="page-subtitle">Official course listings for the Economics program.</p>
-            <div className="courses-grid">
-                {Object.entries(INITIAL_COURSES_DATA).map(([level, semesters]) => (
-                    <div key={level}>
-                        <h2>{level}</h2>
-                        {Object.entries(semesters).map(([semester, courses]) => (
-                            <div className="card" key={semester} style={{marginBottom: '2rem'}}>
-                                <h3>{semester}</h3>
-                                <table className="course-list-table">
-                                    <thead>
-                                        <tr><th>Code</th><th>Title</th><th>Units</th></tr>
-                                    </thead>
-                                    <tbody>
-                                        {courses.map(course => (
-                                            <tr key={course.id}>
-                                                <td>{course.code}</td>
-                                                <td>{course.title}</td>
-                                                <td>{course.units}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        ))}
+            <div className="course-level-tabs">
+                {levels.map(level => (
+                    <button 
+                        key={level} 
+                        className={activeLevel === level ? 'active' : ''}
+                        onClick={() => setActiveLevel(level)}
+                    >
+                        {level}
+                    </button>
+                ))}
+            </div>
+            <div className="level-semesters-grid">
+                {Object.entries(activeSemesters).map(([semester, courses]) => (
+                    <div className="semester-column card" key={semester}>
+                        <h3>{semester}</h3>
+                        <table className="course-list-table">
+                            <thead>
+                                <tr><th>Code</th><th>Title</th><th>Units</th></tr>
+                            </thead>
+                            <tbody>
+                                {courses.map(course => (
+                                    <tr key={course.id}>
+                                        <td>{course.code}</td>
+                                        <td>{course.title}</td>
+                                        <td>{course.units}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 ))}
             </div>
@@ -785,16 +794,17 @@ interface CoursePlannerPageProps {
     currentUser: CurrentUser;
     coursePlans: CoursePlan[];
     onUpdateCoursePlan: (semester: string, courseCodes: string[]) => void;
+    coursesData: CoursesData;
 }
-const CoursePlannerPage = ({ currentUser, coursePlans, onUpdateCoursePlan }: CoursePlannerPageProps) => {
+const CoursePlannerPage = ({ currentUser, coursePlans, onUpdateCoursePlan, coursesData }: CoursePlannerPageProps) => {
     const [selectedSemester, setSelectedSemester] = useState('100 Level Harmattan Semester');
     
-    const allSemesters = Object.entries(INITIAL_COURSES_DATA).flatMap(([level, semesters]) => 
+    const allSemesters = Object.entries(coursesData).flatMap(([level, semesters]) => 
         Object.keys(semesters).map(semester => `${level} ${semester}`)
     );
     
     const coursesForSemester = (level: string, semester: string): Course[] => {
-        return INITIAL_COURSES_DATA[level]?.[semester] || [];
+        return coursesData[level]?.[semester] || [];
     };
     
     const [level, semesterName] = selectedSemester.split(/ (Harmattan|Rain) /);
@@ -892,8 +902,9 @@ interface AssignmentsPageProps {
     assignments: Assignment[];
     currentUser: CurrentUser;
     onAddAssignment: (data: Omit<Assignment, 'id'>) => void;
+    ALL_COURSE_CODES: string[];
 }
-const AssignmentsPage = ({ assignments, currentUser, onAddAssignment }: AssignmentsPageProps) => {
+const AssignmentsPage = ({ assignments, currentUser, onAddAssignment, ALL_COURSE_CODES }: AssignmentsPageProps) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState({ title: '', description: '', dueDate: '', courseCode: '' });
     const isAdmin = currentUser.role === 'Class President' || currentUser.role === 'Admin';
@@ -964,8 +975,9 @@ interface ResourceLibraryPageProps {
     resources: Resource[];
     currentUser: CurrentUser;
     onAddResource: (data: Omit<Resource, 'id'>) => void;
+    ALL_COURSE_CODES: string[];
 }
-const ResourceLibraryPage = ({ resources, currentUser, onAddResource }: ResourceLibraryPageProps) => {
+const ResourceLibraryPage = ({ resources, currentUser, onAddResource, ALL_COURSE_CODES }: ResourceLibraryPageProps) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState({ title: '', courseCode: '' });
     const [file, setFile] = useState<File | null>(null);
@@ -1115,8 +1127,9 @@ const QuizzesPage = ({ quizzes, submissions, currentUser, setRoute }: QuizzesPag
 interface CreateQuizPageProps {
     onAddQuiz: (quiz: Omit<Quiz, 'id' | 'creatorId'>) => void;
     setRoute: (route: Route) => void;
+    ALL_COURSE_CODES: string[];
 }
-const CreateQuizPage = ({ onAddQuiz, setRoute }: CreateQuizPageProps) => {
+const CreateQuizPage = ({ onAddQuiz, setRoute, ALL_COURSE_CODES }: CreateQuizPageProps) => {
     const [title, setTitle] = useState('');
     const [courseCode, setCourseCode] = useState('');
     const [questions, setQuestions] = useState<Omit<QuizQuestion, 'id'>[]>([{ text: '', options: ['', ''], correctAnswerIndex: 0 }]);
@@ -1295,8 +1308,9 @@ interface GradebookPageProps {
     currentUser: CurrentUser;
     customGrades: CustomGrade[];
     onAddCustomGrade: (grade: Omit<CustomGrade, 'id' | 'userId'>) => void;
+    ALL_COURSE_CODES: string[];
 }
-const GradebookPage = ({ currentUser, customGrades, onAddCustomGrade }: GradebookPageProps) => {
+const GradebookPage = ({ currentUser, customGrades, onAddCustomGrade, ALL_COURSE_CODES }: GradebookPageProps) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState({ courseCode: '', itemName: '', score: '', total: '' });
 
@@ -1854,13 +1868,17 @@ interface TutoringMarketplacePageProps {
 const TutoringMarketplacePage = ({ currentUser, tutorProfiles, onRegisterTutor }: TutoringMarketplacePageProps) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const existingProfile = tutorProfiles.find(p => p.userId === currentUser.id);
-    const [formData, setFormData] = useState(existingProfile || { subjects: [], rate: '', availability: '' });
+    const [formData, setFormData] = useState({
+        subjects: existingProfile?.subjects.join(', ') || '',
+        rate: existingProfile?.rate || '',
+        availability: existingProfile?.availability || '',
+    });
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         onRegisterTutor({
             ...formData,
-            subjects: typeof formData.subjects === 'string' ? (formData.subjects as string).split(',').map(s => s.trim()) : formData.subjects,
+            subjects: formData.subjects.split(',').map(s => s.trim()),
         });
         setIsModalOpen(false);
     };
@@ -1879,7 +1897,7 @@ const TutoringMarketplacePage = ({ currentUser, tutorProfiles, onRegisterTutor }
 
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={existingProfile ? 'Update Tutor Profile' : 'Tutor Registration'}>
                 <form onSubmit={handleSubmit}>
-                    <div className="form-group"><label>Subjects (comma-separated)</label><input type="text" value={Array.isArray(formData.subjects) ? formData.subjects.join(', ') : formData.subjects} onChange={e => setFormData({ ...formData, subjects: e.target.value })} required /></div>
+                    <div className="form-group"><label>Subjects (comma-separated)</label><input type="text" value={formData.subjects} onChange={e => setFormData({ ...formData, subjects: e.target.value })} required /></div>
                     <div className="form-group"><label>Rate (e.g., ₦2000/hr)</label><input type="text" value={formData.rate} onChange={e => setFormData({ ...formData, rate: e.target.value })} required /></div>
                     <div className="form-group"><label>Availability</label><textarea value={formData.availability} onChange={e => setFormData({ ...formData, availability: e.target.value })} required /></div>
                     <div className="form-actions">
@@ -2057,7 +2075,7 @@ interface LostAndFoundPageProps {
     onAddItem: (item: Omit<LostFoundItem, 'id' | 'postedById' | 'timestamp'>) => void;
     users: User[];
 }
-const LostAndFoundPage = ({ items, currentUser, onAddItem, users }: LostFoundFoundPageProps) => {
+const LostAndFoundPage = ({ items, currentUser, onAddItem, users }: LostAndFoundPageProps) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState({ type: 'lost' as 'lost' | 'found', itemName: '', description: '', location: '' });
 
@@ -2166,10 +2184,11 @@ const FlashcardsPage = ({ flashcardSets, currentUser, setRoute }: FlashcardsPage
 };
 
 interface CreateFlashcardSetPageProps {
-    onAddSet: (set: Omit<FlashcardSet, 'id' | 'creatorId'>) => void;
+    onAddSet: (set: { title: string, courseCode: string, cards: Omit<Flashcard, 'id'>[] }) => void;
     setRoute: (route: Route) => void;
+    ALL_COURSE_CODES: string[];
 }
-const CreateFlashcardSetPage = ({ onAddSet, setRoute }: CreateFlashcardSetPageProps) => {
+const CreateFlashcardSetPage = ({ onAddSet, setRoute, ALL_COURSE_CODES }: CreateFlashcardSetPageProps) => {
     const [title, setTitle] = useState('');
     const [courseCode, setCourseCode] = useState('');
     const [cards, setCards] = useState<Omit<Flashcard, 'id'>[]>([{ front: '', back: '' }]);
@@ -2390,11 +2409,28 @@ interface AdminPanelPageProps {
     approvedMatricNumbers: string[];
     onAddMatricNumber: (matric: string) => void;
     onRemoveMatricNumber: (matric: string) => void;
+    coursesData: CoursesData;
+    onAddCourse: (level: string, semester: string, course: Omit<Course, 'id'>) => void;
+    onUpdateCourse: (level: string, semester: string, course: Course) => void;
+    onDeleteCourse: (level: string, semester: string, courseId: number) => void;
+    announcements: Announcement[];
+    onUpdateAnnouncement: (announcement: Announcement) => void;
+    onDeleteAnnouncement: (announcementId: number) => void;
+    assignments: Assignment[];
+    onUpdateAssignment: (assignment: Assignment) => void;
+    onDeleteAssignment: (assignmentId: number) => void;
 }
-const AdminPanelPage = ({ users, onUpdateUserStatus, onUpdateUserRole, approvedMatricNumbers, onAddMatricNumber, onRemoveMatricNumber }: AdminPanelPageProps) => {
+const AdminPanelPage = (props: AdminPanelPageProps) => {
+    const { users, onUpdateUserStatus, onUpdateUserRole, approvedMatricNumbers, onAddMatricNumber, onRemoveMatricNumber, coursesData, onAddCourse, onUpdateCourse, onDeleteCourse, announcements, onUpdateAnnouncement, onDeleteAnnouncement, assignments, onUpdateAssignment, onDeleteAssignment } = props;
     const [activeTab, setActiveTab] = useState('users');
     const [searchTerm, setSearchTerm] = useState('');
     const [newMatric, setNewMatric] = useState('');
+    
+    // Modal state for editing items
+    const [editingItem, setEditingItem] = useState<any>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [modalType, setModalType] = useState('');
+
 
     const filteredUsers = users.filter(u => u.fullName.toLowerCase().includes(searchTerm.toLowerCase()));
     
@@ -2404,7 +2440,19 @@ const AdminPanelPage = ({ users, onUpdateUserStatus, onUpdateUserRole, approvedM
             setNewMatric('');
         }
     };
-
+    
+    const openModal = (type: string, item: any) => {
+        setModalType(type);
+        setEditingItem(item);
+        setIsModalOpen(true);
+    };
+    
+    const closeModal = () => {
+        setIsModalOpen(false);
+        setEditingItem(null);
+        setModalType('');
+    };
+    
     const renderUserManagement = () => (
         <>
             <h3>User Management</h3>
@@ -2458,6 +2506,126 @@ const AdminPanelPage = ({ users, onUpdateUserStatus, onUpdateUserRole, approvedM
         </>
     );
 
+    const renderCourseManagement = () => (
+        <>
+            <h3>Course Management</h3>
+            <div className="card">
+                {Object.entries(coursesData).map(([level, semesters]) => (
+                    <details key={level} className="admin-course-level">
+                        <summary>{level}</summary>
+                        {Object.entries(semesters).map(([semester, courses]) => (
+                            <div key={semester}>
+                                <h4>{semester}</h4>
+                                <table className="user-table">
+                                    <thead><tr><th>Code</th><th>Title</th><th>Units</th><th>Actions</th></tr></thead>
+                                    <tbody>
+                                        {courses.map(course => (
+                                            <tr key={course.id}>
+                                                <td>{course.code}</td><td>{course.title}</td><td>{course.units}</td>
+                                                <td className="admin-table-actions">
+                                                    <button className="btn-secondary btn-sm" onClick={() => openModal('course', { ...course, level, semester })}>Edit</button>
+                                                    <button className="btn-danger btn-sm" onClick={() => onDeleteCourse(level, semester, course.id)}>Delete</button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ))}
+                    </details>
+                ))}
+            </div>
+        </>
+    );
+
+    const renderAnnouncementManagement = () => (
+        <>
+            <h3>Announcement Management</h3>
+             <div className="table-container card">
+                 <table className="user-table">
+                    <thead><tr><th>Title</th><th>Date</th><th>Actions</th></tr></thead>
+                    <tbody>
+                        {announcements.map(item => (
+                            <tr key={item.id}>
+                                <td>{item.title}</td><td>{item.date}</td>
+                                <td className="admin-table-actions">
+                                    <button className="btn-secondary btn-sm" onClick={() => openModal('announcement', item)}>Edit</button>
+                                    <button className="btn-danger btn-sm" onClick={() => onDeleteAnnouncement(item.id)}>Delete</button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                 </table>
+             </div>
+        </>
+    );
+
+    const renderAssignmentManagement = () => (
+        <>
+            <h3>Assignment Management</h3>
+             <div className="table-container card">
+                 <table className="user-table">
+                    <thead><tr><th>Title</th><th>Course</th><th>Due Date</th><th>Actions</th></tr></thead>
+                    <tbody>
+                        {assignments.map(item => (
+                            <tr key={item.id}>
+                                <td>{item.title}</td><td>{item.courseCode}</td><td>{item.dueDate}</td>
+                                <td className="admin-table-actions">
+                                    <button className="btn-secondary btn-sm" onClick={() => openModal('assignment', item)}>Edit</button>
+                                    <button className="btn-danger btn-sm" onClick={() => onDeleteAssignment(item.id)}>Delete</button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                 </table>
+             </div>
+        </>
+    );
+    
+    const renderModal = () => {
+        if (!isModalOpen || !editingItem) return null;
+        
+        const handleItemChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+            setEditingItem({ ...editingItem, [e.target.name]: e.target.value });
+        };
+        
+        switch (modalType) {
+            case 'course':
+                return (
+                    <Modal isOpen={isModalOpen} onClose={closeModal} title={`Edit Course: ${editingItem.code}`}>
+                        <form onSubmit={e => { e.preventDefault(); onUpdateCourse(editingItem.level, editingItem.semester, editingItem); closeModal(); }}>
+                            <div className="form-group"><label>Code</label><input type="text" name="code" value={editingItem.code} onChange={handleItemChange} /></div>
+                            <div className="form-group"><label>Title</label><input type="text" name="title" value={editingItem.title} onChange={handleItemChange} /></div>
+                            <div className="form-group"><label>Units</label><input type="text" name="units" value={editingItem.units} onChange={handleItemChange} /></div>
+                            <div className="form-actions"><button type="submit" className="btn-primary">Save Changes</button></div>
+                        </form>
+                    </Modal>
+                );
+            case 'announcement':
+                 return (
+                    <Modal isOpen={isModalOpen} onClose={closeModal} title="Edit Announcement">
+                        <form onSubmit={e => { e.preventDefault(); onUpdateAnnouncement(editingItem); closeModal(); }}>
+                            <div className="form-group"><label>Title</label><input type="text" name="title" value={editingItem.title} onChange={handleItemChange} /></div>
+                            <div className="form-group"><label>Content</label><textarea name="content" value={editingItem.content} onChange={handleItemChange} rows={5}/></div>
+                            <div className="form-actions"><button type="submit" className="btn-primary">Save Changes</button></div>
+                        </form>
+                    </Modal>
+                );
+            case 'assignment':
+                 return (
+                    <Modal isOpen={isModalOpen} onClose={closeModal} title="Edit Assignment">
+                        <form onSubmit={e => { e.preventDefault(); onUpdateAssignment(editingItem); closeModal(); }}>
+                            <div className="form-group"><label>Title</label><input type="text" name="title" value={editingItem.title} onChange={handleItemChange} /></div>
+                            <div className="form-group"><label>Description</label><textarea name="description" value={editingItem.description} onChange={handleItemChange} rows={5}/></div>
+                            <div className="form-group"><label>Due Date</label><input type="date" name="dueDate" value={editingItem.dueDate} onChange={handleItemChange} /></div>
+                            <div className="form-actions"><button type="submit" className="btn-primary">Save Changes</button></div>
+                        </form>
+                    </Modal>
+                );
+            default: return null;
+        }
+    };
+
 
     return (
         <div>
@@ -2465,11 +2633,18 @@ const AdminPanelPage = ({ users, onUpdateUserStatus, onUpdateUserRole, approvedM
             <div className="admin-tabs">
                 <button className={activeTab === 'users' ? 'active' : ''} onClick={() => setActiveTab('users')}>User Management</button>
                 <button className={activeTab === 'matric' ? 'active' : ''} onClick={() => setActiveTab('matric')}>Matric Numbers</button>
+                <button className={activeTab === 'courses' ? 'active' : ''} onClick={() => setActiveTab('courses')}>Courses</button>
+                <button className={activeTab === 'announcements' ? 'active' : ''} onClick={() => setActiveTab('announcements')}>Announcements</button>
+                <button className={activeTab === 'assignments' ? 'active' : ''} onClick={() => setActiveTab('assignments')}>Assignments</button>
             </div>
             <div className="admin-section">
                 {activeTab === 'users' && renderUserManagement()}
                 {activeTab === 'matric' && renderMatricManagement()}
+                {activeTab === 'courses' && renderCourseManagement()}
+                {activeTab === 'announcements' && renderAnnouncementManagement()}
+                {activeTab === 'assignments' && renderAssignmentManagement()}
             </div>
+            {renderModal()}
         </div>
     );
 };
@@ -2502,6 +2677,14 @@ const App = () => {
     const [tutorProfiles, setTutorProfiles] = useLocalStorage<TutorProfile[]>('tutorProfiles', []);
     const [publicNotes, setPublicNotes] = useLocalStorage<PublicNote[]>('publicNotes', []);
     const [messages, setMessages] = useLocalStorage<Message[]>('messages', []);
+    
+    // Make courses editable by admin
+    const [coursesData, setCoursesData] = useLocalStorage<CoursesData>('coursesData', INITIAL_COURSES_DATA);
+    
+    const ALL_COURSE_CODES = useMemo(() => {
+        return [...new Set(Object.values(coursesData).flatMap(s => Object.values(s).flat()).map(c => c.code))].sort();
+    }, [coursesData]);
+
 
     // --- HANDLER FUNCTIONS ---
 
@@ -2551,7 +2734,7 @@ const App = () => {
 
     const handleAddAnnouncement = (data: { title: string; content: string }) => {
         const newAnnouncement: Announcement = { id: Date.now(), ...data, date: new Date().toLocaleDateString() };
-        setAnnouncements(prev => [newAnnouncement, ...prev]);
+        setAnnouncements(prev => [newAnnouncement, ...prev].sort((a,b) => b.id - a.id));
         users.forEach(u => u.id !== currentUser?.id && createNotification(u.id, `New Announcement: ${data.title}`, { page: 'announcements' }));
     };
 
@@ -2606,7 +2789,7 @@ const App = () => {
         setCalendarEvents(prev => [...prev, { ...event, id: Date.now() }]);
     };
 
-    const handleAddFlashcardSet = (set: Omit<FlashcardSet, 'id' | 'creatorId'>) => {
+    const handleAddFlashcardSet = (set: { title: string, courseCode: string, cards: Omit<Flashcard, 'id'>[] }) => {
         if (!currentUser) return;
         const newSet = { ...set, id: Date.now(), creatorId: currentUser.id, cards: set.cards.map((c, i) => ({...c, id: Date.now() + i})) };
         setFlashcardSets(prev => [newSet, ...prev]);
@@ -2647,7 +2830,6 @@ const App = () => {
         setPolls(prev => prev.map(poll => {
             if (poll.id === pollId) {
                 const newOptions = poll.options.map((opt, i) => {
-                    // Remove previous vote if any
                     const filteredVotes = opt.votes.filter(v => v !== currentUser.id);
                     if (i === optionIndex) {
                         return { ...opt, votes: [...filteredVotes, currentUser.id] };
@@ -2694,17 +2876,50 @@ const App = () => {
     const handleUpdateUserStatus = (userId: number, status: User['status']) => {
         setUsers(prev => prev.map(u => u.id === userId ? { ...u, status } : u));
     };
-    
     const handleUpdateUserRole = (userId: number, role: User['role']) => {
         setUsers(prev => prev.map(u => u.id === userId ? { ...u, role } : u));
     };
-    
     const handleAddMatricNumber = (matric: string) => {
         setApprovedMatricNumbers(prev => [...prev, matric].sort());
     };
-
     const handleRemoveMatricNumber = (matric: string) => {
         setApprovedMatricNumbers(prev => prev.filter(m => m !== matric));
+    };
+    const handleUpdateAnnouncement = (updatedAnnouncement: Announcement) => {
+        setAnnouncements(prev => prev.map(item => item.id === updatedAnnouncement.id ? updatedAnnouncement : item));
+    };
+    const handleDeleteAnnouncement = (id: number) => {
+        setAnnouncements(prev => prev.filter(item => item.id !== id));
+    };
+    const handleUpdateAssignment = (updatedAssignment: Assignment) => {
+        setAssignments(prev => prev.map(item => item.id === updatedAssignment.id ? updatedAssignment : item));
+    };
+    const handleDeleteAssignment = (id: number) => {
+        setAssignments(prev => prev.filter(item => item.id !== id));
+    };
+    const handleAddCourse = (level: string, semester: string, course: Omit<Course, 'id'>) => {
+        setCoursesData(prev => {
+            const newData = JSON.parse(JSON.stringify(prev));
+            newData[level][semester].push({ ...course, id: Date.now() });
+            return newData;
+        });
+    };
+    const handleUpdateCourse = (level: string, semester: string, updatedCourse: Course) => {
+        setCoursesData(prev => {
+            const newData = JSON.parse(JSON.stringify(prev));
+            const courseIndex = newData[level][semester].findIndex((c: Course) => c.id === updatedCourse.id);
+            if(courseIndex > -1) {
+                newData[level][semester][courseIndex] = updatedCourse;
+            }
+            return newData;
+        });
+    };
+    const handleDeleteCourse = (level: string, semester: string, courseId: number) => {
+        setCoursesData(prev => {
+            const newData = JSON.parse(JSON.stringify(prev));
+            newData[level][semester] = newData[level][semester].filter((c: Course) => c.id !== courseId);
+            return newData;
+        });
     };
 
     // --- RENDER LOGIC ---
@@ -2717,14 +2932,14 @@ const App = () => {
         switch (route.page) {
             case 'home': return <HomePage currentUser={currentUser} announcements={announcements} />;
             case 'announcements': return <AnnouncementsPage announcements={announcements} currentUser={currentUser} onAddAnnouncement={handleAddAnnouncement} />;
-            case 'courses': return <CoursesPage />;
-            case 'coursePlanner': return <CoursePlannerPage currentUser={currentUser} coursePlans={coursePlans} onUpdateCoursePlan={handleUpdateCoursePlan} />;
+            case 'courses': return <CoursesPage coursesData={coursesData} />;
+            case 'coursePlanner': return <CoursePlannerPage currentUser={currentUser} coursePlans={coursePlans} onUpdateCoursePlan={handleUpdateCoursePlan} coursesData={coursesData} />;
             case 'faculty': return <FacultyDirectoryPage faculty={INITIAL_FACULTY} />;
-            case 'assignments': return <AssignmentsPage assignments={assignments} currentUser={currentUser} onAddAssignment={handleAddAssignment} />;
-            case 'resourceLibrary': return <ResourceLibraryPage resources={resources} currentUser={currentUser} onAddResource={handleAddResource} />;
+            case 'assignments': return <AssignmentsPage assignments={assignments} currentUser={currentUser} onAddAssignment={handleAddAssignment} ALL_COURSE_CODES={ALL_COURSE_CODES} />;
+            case 'resourceLibrary': return <ResourceLibraryPage resources={resources} currentUser={currentUser} onAddResource={handleAddResource} ALL_COURSE_CODES={ALL_COURSE_CODES} />;
             
             case 'quizzes': return <QuizzesPage quizzes={quizzes} submissions={quizSubmissions} currentUser={currentUser} setRoute={setRoute} />;
-            case 'createQuiz': return <CreateQuizPage onAddQuiz={handleAddQuiz} setRoute={setRoute} />;
+            case 'createQuiz': return <CreateQuizPage onAddQuiz={handleAddQuiz} setRoute={setRoute} ALL_COURSE_CODES={ALL_COURSE_CODES} />;
             case 'takeQuiz': {
                 const quiz = quizzes.find(q => q.id === route.quizId);
                 return quiz ? <TakeQuizPage quiz={quiz} currentUser={currentUser} onSubmit={handleQuizSubmission} setRoute={setRoute} /> : <div>Quiz not found.</div>;
@@ -2736,13 +2951,13 @@ const App = () => {
             }
 
             case 'flashcards': return <FlashcardsPage flashcardSets={flashcardSets} currentUser={currentUser} setRoute={setRoute} />;
-            case 'createFlashcardSet': return <CreateFlashcardSetPage onAddSet={handleAddFlashcardSet} setRoute={setRoute} />;
+            case 'createFlashcardSet': return <CreateFlashcardSetPage onAddSet={handleAddFlashcardSet} setRoute={setRoute} ALL_COURSE_CODES={ALL_COURSE_CODES} />;
             case 'viewFlashcardSet': {
                 const set = flashcardSets.find(s => s.id === route.setId);
                 return set ? <ViewFlashcardSetPage set={set} setRoute={setRoute} /> : <div>Set not found.</div>;
             }
 
-            case 'gradebook': return <GradebookPage currentUser={currentUser} customGrades={customGrades} onAddCustomGrade={handleAddCustomGrade} />;
+            case 'gradebook': return <GradebookPage currentUser={currentUser} customGrades={customGrades} onAddCustomGrade={handleAddCustomGrade} ALL_COURSE_CODES={ALL_COURSE_CODES} />;
             case 'gpaCalculator': return <GpaCalculatorPage currentUser={currentUser} gpaEntries={gpaEntries} onAddGpaEntry={handleAddGpaEntry} />;
             
             case 'forums': return <ForumsPage threads={forumThreads} currentUser={currentUser} onAddForumThread={handleAddForumThread} users={users} setRoute={setRoute} />;
@@ -2761,7 +2976,13 @@ const App = () => {
             case 'publicNotes': return <PublicNotesPage currentUser={currentUser} publicNotes={publicNotes} onAddPublicNote={handleAddPublicNote} users={users} />;
             
             case 'profile': return <ProfilePage currentUser={currentUser} onUpdateUser={handleUpdateUser} />;
-            case 'admin': return <AdminPanelPage users={users} onUpdateUserStatus={handleUpdateUserStatus} onUpdateUserRole={handleUpdateUserRole} approvedMatricNumbers={approvedMatricNumbers} onAddMatricNumber={handleAddMatricNumber} onRemoveMatricNumber={handleRemoveMatricNumber} />;
+            case 'admin': return <AdminPanelPage 
+                users={users} onUpdateUserStatus={handleUpdateUserStatus} onUpdateUserRole={handleUpdateUserRole} 
+                approvedMatricNumbers={approvedMatricNumbers} onAddMatricNumber={handleAddMatricNumber} onRemoveMatricNumber={handleRemoveMatricNumber}
+                coursesData={coursesData} onAddCourse={handleAddCourse} onUpdateCourse={handleUpdateCourse} onDeleteCourse={handleDeleteCourse}
+                announcements={announcements} onUpdateAnnouncement={handleUpdateAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement}
+                assignments={assignments} onUpdateAssignment={handleUpdateAssignment} onDeleteAssignment={handleDeleteAssignment}
+             />;
             default: return <div>Page not found.</div>;
         }
     };
