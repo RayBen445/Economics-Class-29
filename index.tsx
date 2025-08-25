@@ -293,12 +293,6 @@ const INITIAL_COURSES_DATA: CoursesData = {
         ]
     }
 };
-const INITIAL_FACULTY: Faculty[] = [
-    { id: 1, name: "Dr. Adekunle Gold", title: "Head of Department", email: "agold@lautech.edu", office: "ECO-101", courses: ["ECO 401", "ECO 403"], profilePicture: "https://api.dicebear.com/7.x/adventurer/svg?seed=Adekunle" },
-    { id: 2, name: "Prof. Bisola Aiyeola", title: "Professor", email: "baiyeola@lautech.edu", office: "ECO-102", courses: ["ECO 301", "ECO 303"], profilePicture: "https://api.dicebear.com/7.x/adventurer/svg?seed=Bisola" },
-    { id: 3, name: "Mr. Chike Eze", title: "Lecturer I", email: "ceze@lautech.edu", office: "ECO-201", courses: ["ECO 201", "ECO 203"], profilePicture: "https://api.dicebear.com/7.x/adventurer/svg?seed=Chike" },
-    { id: 4, name: "Mrs. Dolapo Otedola", title: "Lecturer II", email: "dotedola@lautech.edu", office: "ECO-205", courses: ["ECO 101", "ECO 102"], profilePicture: "https://api.dicebear.com/7.x/adventurer/svg?seed=Dolapo" },
-];
 
 // --- HOOKS ---
 const useLocalStorage = <T,>(key: string, initialValue: T): [T, (value: T | ((val: T) => T)) => void] => {
@@ -2419,10 +2413,20 @@ interface AdminPanelPageProps {
     assignments: Assignment[];
     onUpdateAssignment: (assignment: Assignment) => void;
     onDeleteAssignment: (assignmentId: number) => void;
+    faculty: Faculty[];
+    onAddFaculty: (faculty: Omit<Faculty, 'id'>) => void;
+    onUpdateFaculty: (faculty: Faculty) => void;
+    onDeleteFaculty: (facultyId: number) => void;
+    quizzes: Quiz[];
+    onDeleteQuiz: (quizId: number) => void;
+    polls: Poll[];
+    onDeletePoll: (pollId: number) => void;
+    systemSettings: { maintenanceMode: boolean };
+    onUpdateSystemSettings: (settings: { maintenanceMode: boolean }) => void;
 }
 const AdminPanelPage = (props: AdminPanelPageProps) => {
-    const { users, onUpdateUserStatus, onUpdateUserRole, approvedMatricNumbers, onAddMatricNumber, onRemoveMatricNumber, coursesData, onAddCourse, onUpdateCourse, onDeleteCourse, announcements, onUpdateAnnouncement, onDeleteAnnouncement, assignments, onUpdateAssignment, onDeleteAssignment } = props;
-    const [activeTab, setActiveTab] = useState('users');
+    const { users, onUpdateUserStatus, onUpdateUserRole, approvedMatricNumbers, onAddMatricNumber, onRemoveMatricNumber, coursesData, onAddCourse, onUpdateCourse, onDeleteCourse, announcements, onUpdateAnnouncement, onDeleteAnnouncement, assignments, onUpdateAssignment, onDeleteAssignment, faculty, onAddFaculty, onUpdateFaculty, onDeleteFaculty, quizzes, onDeleteQuiz, polls, onDeletePoll, systemSettings, onUpdateSystemSettings } = props;
+    const [activeTab, setActiveTab] = useState('dashboard');
     const [searchTerm, setSearchTerm] = useState('');
     const [newMatric, setNewMatric] = useState('');
     
@@ -2453,6 +2457,18 @@ const AdminPanelPage = (props: AdminPanelPageProps) => {
         setModalType('');
     };
     
+    const renderDashboard = () => (
+        <>
+            <h3>Dashboard</h3>
+            <div className="admin-dashboard-grid">
+                <div className="dashboard-card"><h4>Total Users</h4><p>{users.length}</p></div>
+                <div className="dashboard-card"><h4>Announcements</h4><p>{announcements.length}</p></div>
+                <div className="dashboard-card"><h4>Assignments</h4><p>{assignments.length}</p></div>
+                <div className="dashboard-card"><h4>Quizzes</h4><p>{quizzes.length}</p></div>
+            </div>
+        </>
+    );
+
     const renderUserManagement = () => (
         <>
             <h3>User Management</h3>
@@ -2477,7 +2493,7 @@ const AdminPanelPage = (props: AdminPanelPageProps) => {
                                     </select>
                                 </td>
                                 <td className="actions">
-                                    <button className="btn-secondary btn-sm">View Profile</button>
+                                    <button className="btn-secondary btn-sm" onClick={() => openModal('viewUser', user)}>View</button>
                                 </td>
                             </tr>
                         ))}
@@ -2537,6 +2553,31 @@ const AdminPanelPage = (props: AdminPanelPageProps) => {
             </div>
         </>
     );
+    
+    const renderFacultyManagement = () => (
+        <>
+            <h3>Faculty Management</h3>
+            <div className="admin-toolbar">
+                <button className="btn-primary" onClick={() => openModal('faculty', { name: '', title: '', email: '', office: '', courses: [], profilePicture: `https://api.dicebear.com/7.x/adventurer/svg?seed=new` })} >+ Add Faculty Member</button>
+            </div>
+            <div className="table-container card">
+                <table className="user-table">
+                    <thead><tr><th>Name</th><th>Title</th><th>Email</th><th>Actions</th></tr></thead>
+                    <tbody>
+                        {faculty.map(member => (
+                            <tr key={member.id}>
+                                <td>{member.name}</td><td>{member.title}</td><td>{member.email}</td>
+                                <td className="admin-table-actions">
+                                    <button className="btn-secondary btn-sm" onClick={() => openModal('faculty', member)}>Edit</button>
+                                    <button className="btn-danger btn-sm" onClick={() => onDeleteFaculty(member.id)}>Delete</button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </>
+    );
 
     const renderAnnouncementManagement = () => (
         <>
@@ -2581,7 +2622,131 @@ const AdminPanelPage = (props: AdminPanelPageProps) => {
              </div>
         </>
     );
+
+    const renderQuizManagement = () => (
+        <>
+            <h3>Quiz Management</h3>
+            <div className="table-container card">
+                <table className="user-table">
+                    <thead><tr><th>Title</th><th>Course</th><th>Questions</th><th>Actions</th></tr></thead>
+                    <tbody>
+                        {quizzes.map(quiz => (
+                            <tr key={quiz.id}>
+                                <td>{quiz.title}</td><td>{quiz.courseCode}</td><td>{quiz.questions.length}</td>
+                                <td className="admin-table-actions">
+                                    <button className="btn-danger btn-sm" onClick={() => onDeleteQuiz(quiz.id)}>Delete</button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </>
+    );
+
+    const renderPollManagement = () => (
+        <>
+            <h3>Poll Management</h3>
+            <div className="table-container card">
+                <table className="user-table">
+                    <thead><tr><th>Question</th><th>Options</th><th>Total Votes</th><th>Actions</th></tr></thead>
+                    <tbody>
+                        {polls.map(poll => (
+                            <tr key={poll.id}>
+                                <td>{poll.question}</td>
+                                <td>{poll.options.length}</td>
+                                <td>{poll.options.reduce((acc, opt) => acc + opt.votes.length, 0)}</td>
+                                <td className="admin-table-actions">
+                                    <button className="btn-danger btn-sm" onClick={() => onDeletePoll(poll.id)}>Delete</button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </>
+    );
+
+    const renderSettingsManagement = () => {
+        const backupData = () => {
+            const allData: { [key: string]: string | null } = {};
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key) {
+                    allData[key] = localStorage.getItem(key);
+                }
+            }
+            const blob = new Blob([JSON.stringify(allData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `portal-backup-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        };
     
+        const restoreInputRef = useRef<HTMLInputElement>(null);
+    
+        const handleRestoreClick = () => {
+            restoreInputRef.current?.click();
+        };
+    
+        const handleRestore = (event: React.ChangeEvent<HTMLInputElement>) => {
+            const file = event.target.files?.[0];
+            if (!file) return;
+    
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const text = e.target?.result;
+                    if (typeof text !== 'string') throw new Error("File could not be read");
+                    const data = JSON.parse(text);
+                    if (window.confirm("Are you sure you want to restore? This will overwrite all current data.")) {
+                        localStorage.clear();
+                        Object.keys(data).forEach(key => {
+                            localStorage.setItem(key, data[key]);
+                        });
+                        alert("Restore successful! The application will now reload.");
+                        window.location.reload();
+                    }
+                } catch (error) {
+                    alert("Error parsing backup file. Please make sure it's a valid JSON file from this application.");
+                    console.error("Restore error:", error);
+                }
+            };
+            reader.readAsText(file);
+        };
+    
+        return (
+            <>
+                <h3>System Settings</h3>
+                <div className="card">
+                    <h4>Maintenance Mode</h4>
+                    <p>When enabled, only admins can access the portal. Other users will see a maintenance page.</p>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <input 
+                            type="checkbox" 
+                            checked={systemSettings.maintenanceMode} 
+                            onChange={e => onUpdateSystemSettings({ ...systemSettings, maintenanceMode: e.target.checked })} 
+                        />
+                        Enable Maintenance Mode
+                    </label>
+                </div>
+                <div className="card" style={{marginTop: '2rem'}}>
+                    <h4>Data Management</h4>
+                    <p>Backup all portal data to a JSON file, or restore from a backup file. Restoring will overwrite all existing data.</p>
+                    <div className="form-actions" style={{justifyContent: 'flex-start'}}>
+                        <button className="btn-secondary" onClick={backupData}>Backup Data</button>
+                        <button className="btn-tertiary" onClick={handleRestoreClick}>Restore Data</button>
+                        <input type="file" ref={restoreInputRef} onChange={handleRestore} style={{display: 'none'}} accept=".json" />
+                    </div>
+                </div>
+            </>
+        );
+    };
+
     const renderModal = () => {
         if (!isModalOpen || !editingItem) return null;
         
@@ -2590,6 +2755,19 @@ const AdminPanelPage = (props: AdminPanelPageProps) => {
         };
         
         switch (modalType) {
+            case 'viewUser':
+                return (
+                    <Modal isOpen={isModalOpen} onClose={closeModal} title={`User Profile: ${editingItem.fullName}`}>
+                        <dl className="profile-info">
+                            <dt>Full Name</dt><dd>{editingItem.fullName}</dd>
+                            <dt>Username</dt><dd>{editingItem.username}</dd>
+                            <dt>Email</dt><dd>{editingItem.email}</dd>
+                            <dt>Matric Number</dt><dd>{editingItem.matricNumber}</dd>
+                            <dt>Role</dt><dd>{editingItem.role}</dd>
+                            <dt>Status</dt><dd>{editingItem.status}</dd>
+                        </dl>
+                    </Modal>
+                );
             case 'course':
                 return (
                     <Modal isOpen={isModalOpen} onClose={closeModal} title={`Edit Course: ${editingItem.code}`}>
@@ -2622,6 +2800,53 @@ const AdminPanelPage = (props: AdminPanelPageProps) => {
                         </form>
                     </Modal>
                 );
+            case 'faculty': {
+                const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+                    if (e.target.files && e.target.files[0]) {
+                        const base64 = await getFileAsBase64(e.target.files[0]);
+                        setEditingItem({ ...editingItem, profilePicture: base64 });
+                    }
+                };
+
+                const handleSubmit = (e: React.FormEvent) => {
+                    e.preventDefault();
+                    if (editingItem.id) {
+                        onUpdateFaculty(editingItem);
+                    } else {
+                        onAddFaculty(editingItem);
+                    }
+                    closeModal();
+                };
+
+                return (
+                    <Modal isOpen={isModalOpen} onClose={closeModal} title={editingItem.id ? `Edit Faculty: ${editingItem.name}` : 'Add New Faculty Member'}>
+                        <form onSubmit={handleSubmit}>
+                            <div className="form-group">
+                                <label>Profile Picture</label>
+                                <img src={editingItem.profilePicture} alt="Profile" style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', marginBottom: '1rem', display: 'block' }} />
+                                <input type="file" onChange={handleFileChange} accept="image/*" />
+                            </div>
+                            <div className="form-group"><label>Full Name</label><input type="text" name="name" value={editingItem.name} onChange={handleItemChange} required /></div>
+                            <div className="form-group"><label>Title</label><input type="text" name="title" value={editingItem.title} onChange={handleItemChange} required /></div>
+                            <div className="form-group"><label>Email</label><input type="email" name="email" value={editingItem.email} onChange={handleItemChange} required /></div>
+                            <div className="form-group"><label>Office</label><input type="text" name="office" value={editingItem.office} onChange={handleItemChange} required /></div>
+                            <div className="form-group">
+                                <label>Courses (comma-separated)</label>
+                                <input 
+                                    type="text" 
+                                    name="courses" 
+                                    value={Array.isArray(editingItem.courses) ? editingItem.courses.join(', ') : editingItem.courses || ''} 
+                                    onChange={handleItemChange} 
+                                />
+                            </div>
+                            <div className="form-actions">
+                                <button type="button" className="btn-tertiary" onClick={closeModal}>Cancel</button>
+                                <button type="submit" className="btn-primary">Save Changes</button>
+                            </div>
+                        </form>
+                    </Modal>
+                );
+            }
             default: return null;
         }
     };
@@ -2631,18 +2856,28 @@ const AdminPanelPage = (props: AdminPanelPageProps) => {
         <div>
             <h1 className="page-title">Admin Panel</h1>
             <div className="admin-tabs">
-                <button className={activeTab === 'users' ? 'active' : ''} onClick={() => setActiveTab('users')}>User Management</button>
+                <button className={activeTab === 'dashboard' ? 'active' : ''} onClick={() => setActiveTab('dashboard')}>Dashboard</button>
+                <button className={activeTab === 'users' ? 'active' : ''} onClick={() => setActiveTab('users')}>Users</button>
                 <button className={activeTab === 'matric' ? 'active' : ''} onClick={() => setActiveTab('matric')}>Matric Numbers</button>
                 <button className={activeTab === 'courses' ? 'active' : ''} onClick={() => setActiveTab('courses')}>Courses</button>
+                <button className={activeTab === 'faculty' ? 'active' : ''} onClick={() => setActiveTab('faculty')}>Faculty</button>
                 <button className={activeTab === 'announcements' ? 'active' : ''} onClick={() => setActiveTab('announcements')}>Announcements</button>
                 <button className={activeTab === 'assignments' ? 'active' : ''} onClick={() => setActiveTab('assignments')}>Assignments</button>
+                <button className={activeTab === 'quizzes' ? 'active' : ''} onClick={() => setActiveTab('quizzes')}>Quizzes</button>
+                <button className={activeTab === 'polls' ? 'active' : ''} onClick={() => setActiveTab('polls')}>Polls</button>
+                <button className={activeTab === 'settings' ? 'active' : ''} onClick={() => setActiveTab('settings')}>Settings</button>
             </div>
             <div className="admin-section">
+                {activeTab === 'dashboard' && renderDashboard()}
                 {activeTab === 'users' && renderUserManagement()}
                 {activeTab === 'matric' && renderMatricManagement()}
                 {activeTab === 'courses' && renderCourseManagement()}
+                {activeTab === 'faculty' && renderFacultyManagement()}
                 {activeTab === 'announcements' && renderAnnouncementManagement()}
                 {activeTab === 'assignments' && renderAssignmentManagement()}
+                {activeTab === 'quizzes' && renderQuizManagement()}
+                {activeTab === 'polls' && renderPollManagement()}
+                {activeTab === 'settings' && renderSettingsManagement()}
             </div>
             {renderModal()}
         </div>
@@ -2677,6 +2912,8 @@ const App = () => {
     const [tutorProfiles, setTutorProfiles] = useLocalStorage<TutorProfile[]>('tutorProfiles', []);
     const [publicNotes, setPublicNotes] = useLocalStorage<PublicNote[]>('publicNotes', []);
     const [messages, setMessages] = useLocalStorage<Message[]>('messages', []);
+    const [faculty, setFaculty] = useLocalStorage<Faculty[]>('faculty', []);
+    const [systemSettings, setSystemSettings] = useLocalStorage('systemSettings', { maintenanceMode: false });
     
     // Make courses editable by admin
     const [coursesData, setCoursesData] = useLocalStorage<CoursesData>('coursesData', INITIAL_COURSES_DATA);
@@ -2921,12 +3158,63 @@ const App = () => {
             return newData;
         });
     };
+    
+    const handleAddFaculty = (facultyData: Omit<Faculty, 'id'>) => {
+        let finalCourses = facultyData.courses;
+        if (typeof facultyData.courses === 'string') {
+            finalCourses = (facultyData.courses as string).split(',').map(c => c.trim()).filter(Boolean);
+        }
+        const newFaculty = { ...facultyData, id: Date.now(), courses: finalCourses };
+        setFaculty(prev => [...prev, newFaculty]);
+    };
+
+    const handleUpdateFaculty = (updatedFacultyData: Faculty) => {
+         let finalCourses = updatedFacultyData.courses;
+        if (typeof updatedFacultyData.courses === 'string') {
+            finalCourses = (updatedFacultyData.courses as string).split(',').map(c => c.trim()).filter(Boolean);
+        }
+        const finalData = {...updatedFacultyData, courses: finalCourses};
+        setFaculty(prev => prev.map(f => f.id === finalData.id ? finalData : f));
+    };
+
+    const handleDeleteFaculty = (facultyId: number) => {
+        if(window.confirm('Are you sure you want to delete this faculty member?')) {
+            setFaculty(prev => prev.filter(f => f.id !== facultyId));
+        }
+    };
+
+    const handleDeleteQuiz = (quizId: number) => {
+        if (window.confirm('Are you sure you want to delete this quiz and all its submissions?')) {
+            setQuizzes(prev => prev.filter(q => q.id !== quizId));
+            setQuizSubmissions(prev => prev.filter(s => s.quizId !== quizId));
+        }
+    };
+
+    const handleDeletePoll = (pollId: number) => {
+        if (window.confirm('Are you sure you want to delete this poll?')) {
+            setPolls(prev => prev.filter(p => p.id !== pollId));
+        }
+    };
+
+    const handleUpdateSystemSettings = (settings: { maintenanceMode: boolean }) => {
+        setSystemSettings(prev => ({ ...prev, ...settings }));
+    };
 
     // --- RENDER LOGIC ---
 
     if (!currentUser) {
         return <AuthPage onSignIn={handleSignIn} onSignUp={handleSignUp} users={users} approvedMatricNumbers={approvedMatricNumbers} />;
     }
+    
+    if (systemSettings.maintenanceMode && currentUser.role !== 'Admin' && currentUser.role !== 'Class President') {
+        return (
+            <div className="maintenance-page">
+                <h1>Under Maintenance</h1>
+                <p>The portal is currently undergoing scheduled maintenance. Please check back later.</p>
+            </div>
+        );
+    }
+
 
     const renderPage = () => {
         switch (route.page) {
@@ -2934,7 +3222,7 @@ const App = () => {
             case 'announcements': return <AnnouncementsPage announcements={announcements} currentUser={currentUser} onAddAnnouncement={handleAddAnnouncement} />;
             case 'courses': return <CoursesPage coursesData={coursesData} />;
             case 'coursePlanner': return <CoursePlannerPage currentUser={currentUser} coursePlans={coursePlans} onUpdateCoursePlan={handleUpdateCoursePlan} coursesData={coursesData} />;
-            case 'faculty': return <FacultyDirectoryPage faculty={INITIAL_FACULTY} />;
+            case 'faculty': return <FacultyDirectoryPage faculty={faculty} />;
             case 'assignments': return <AssignmentsPage assignments={assignments} currentUser={currentUser} onAddAssignment={handleAddAssignment} ALL_COURSE_CODES={ALL_COURSE_CODES} />;
             case 'resourceLibrary': return <ResourceLibraryPage resources={resources} currentUser={currentUser} onAddResource={handleAddResource} ALL_COURSE_CODES={ALL_COURSE_CODES} />;
             
@@ -2982,6 +3270,10 @@ const App = () => {
                 coursesData={coursesData} onAddCourse={handleAddCourse} onUpdateCourse={handleUpdateCourse} onDeleteCourse={handleDeleteCourse}
                 announcements={announcements} onUpdateAnnouncement={handleUpdateAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement}
                 assignments={assignments} onUpdateAssignment={handleUpdateAssignment} onDeleteAssignment={handleDeleteAssignment}
+                faculty={faculty} onAddFaculty={handleAddFaculty} onUpdateFaculty={handleUpdateFaculty} onDeleteFaculty={handleDeleteFaculty}
+                quizzes={quizzes} onDeleteQuiz={handleDeleteQuiz}
+                polls={polls} onDeletePoll={handleDeletePoll}
+                systemSettings={systemSettings} onUpdateSystemSettings={handleUpdateSystemSettings}
              />;
             default: return <div>Page not found.</div>;
         }
@@ -2992,6 +3284,7 @@ const App = () => {
     return (
         <div className="app-layout">
             <Sidebar route={route} setRoute={setRoute} isSidebarOpen={isSidebarOpen} />
+            {isSidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)}></div>}
             <div className="main-content-wrapper">
                 <Header 
                     currentUser={currentUser} 

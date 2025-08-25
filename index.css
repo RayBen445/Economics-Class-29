@@ -425,6 +425,23 @@ input[type="file"] {
 }
 .content-section h2 { border-bottom: 2px solid var(--accent-color); display: inline-block; padding-bottom: 0.5rem; margin-bottom: 2rem; }
 
+/* Maintenance Page */
+.maintenance-page {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    text-align: center;
+    background-color: var(--background-color);
+}
+.maintenance-page h1 {
+    font-size: 3rem;
+}
+.maintenance-page p {
+    font-size: 1.2rem;
+    color: var(--text-color);
+}
 
 /* --- ADMIN PANEL --- */
 .admin-tabs {
@@ -484,6 +501,31 @@ input[type="file"] {
 .admin-course-level[open] summary {
     border-bottom: 1px solid var(--border-color);
 }
+.admin-dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+}
+.dashboard-card {
+    background: var(--surface-color);
+    padding: 1.5rem;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+.dashboard-card h4 {
+    margin: 0 0 0.5rem 0;
+    font-family: var(--font-family-body);
+    color: #6B7280;
+    font-size: 1rem;
+}
+.dashboard-card p {
+    margin: 0;
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
 
 /* Rich Text Editor Simulation */
 .rich-text-editor .toolbar {
@@ -854,6 +896,10 @@ input[type="file"] {
 .message-input-form input { flex-grow: 1; border: 1px solid var(--border-color); border-radius: 50px; padding: 0.75rem 1.25rem; }
 .message-input-form button { border-radius: 50px; margin-left: 1rem; }
 
+.sidebar-overlay {
+    display: none;
+}
+
 /* Responsive Design */
 @media (max-width: 992px) {
     .sidebar {
@@ -862,6 +908,17 @@ input[type="file"] {
     .sidebar.open {
         transform: translateX(0);
         box-shadow: 5px 0 15px rgba(0,0,0,0.1);
+    }
+    .sidebar-overlay {
+        display: block;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.5);
+        z-index: 999;
+        cursor: pointer;
     }
     .main-content-wrapper {
         margin-left: 0;
