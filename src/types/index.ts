@@ -19,6 +19,24 @@ export interface User extends SignUpFormData {
 
 export type CurrentUser = Omit<User, 'password'>;
 
+// Firebase User Profile interface
+export interface FirebaseUserProfile {
+  uid: string;
+  email: string;
+  firstName: string;
+  otherName: string;
+  surname: string;
+  username: string;
+  matricNumber: string;
+  fullName: string;
+  role: 'Student' | 'Admin' | 'Class President';
+  status: 'active' | 'suspended' | 'banned';
+  profilePicture?: string;
+  emailVerified: boolean;
+  createdAt: any; // Firestore Timestamp
+  updatedAt: any; // Firestore Timestamp
+}
+
 export interface Announcement {
   id: number;
   title: string;
