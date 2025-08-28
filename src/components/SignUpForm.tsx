@@ -47,9 +47,9 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSwitchToSignIn }) => {
       return;
     }
 
-    // Validate matric number format (basic validation)
-    if (!/^[A-Z]{3}\/\d{2}\/\d{4}$/.test(formData.matricNumber.toUpperCase())) {
-      setError('Please enter a valid matric number (e.g., ECO/21/1234)');
+    // Validate matric number format (exactly 10 digits)
+    if (!/^\d{10}$/.test(formData.matricNumber)) {
+      setError('Please enter a valid matric number (e.g., 2024000000)');
       setLoading(false);
       return;
     }
@@ -150,7 +150,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSwitchToSignIn }) => {
           <input
             type="text"
             name="matricNumber"
-            placeholder="Matric Number (e.g., ECO/21/1234)"
+            placeholder="Matric Number (e.g., 2024000000)"
             value={formData.matricNumber}
             onChange={handleChange}
             required

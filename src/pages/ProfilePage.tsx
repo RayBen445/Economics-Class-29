@@ -24,6 +24,10 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ profile }) => {
   };
 
   const handleSave = async () => {
+    // Validate matric number format (exactly 10 digits)
+    if (!/^\d{10}$/.test(formData.matricNumber)) {
+      return; // Don't save if validation fails - the error will be handled by the hook
+    }
     await updateProfile(formData);
     if (!error) {
       setIsEditing(false);
