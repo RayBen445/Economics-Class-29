@@ -2,43 +2,11 @@ import React from 'react';
 import { Toaster } from 'react-hot-toast';
 import { useFirebaseAuth } from './hooks/useFirebaseAuth';
 import { AuthPage } from './pages/AuthPage';
+import { HomePage } from './pages/HomePage';
 import { EmailVerificationPrompt } from './components/EmailVerificationPrompt';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { ProfilePage } from './pages/ProfilePage';
 import { signOut } from './utils/firebase';
-
-// Import the existing components (we'll extract these from the original index.tsx later)
-import { 
-  HomePage, 
-  Sidebar, 
-  Header,
-  AnnouncementsPage,
-  CoursesPage,
-  CoursePlannerPage,
-  FacultyDirectoryPage,
-  AssignmentsPage,
-  ResourceLibraryPage,
-  QuizzesPage,
-  CreateQuizPage,
-  TakeQuizPage,
-  QuizResultsPage,
-  FlashcardsPage,
-  CreateFlashcardSetPage,
-  ViewFlashcardSetPage,
-  GradebookPage,
-  GpaCalculatorPage,
-  ForumsPage,
-  ViewForumThreadPage,
-  PollsPage,
-  CalendarPage,
-  MembersPage,
-  MessagesPage,
-  TutoringMarketplacePage,
-  JobBoardPage,
-  LostAndFoundPage,
-  PublicNotesPage,
-  AdminPanelPage
-} from './LegacyComponents';
 
 import { Route } from './types';
 
@@ -114,7 +82,7 @@ const App: React.FC = () => {
   const renderPage = () => {
     switch (route.page) {
       case 'home':
-        return <div className="page"><h2>Welcome to LAUTECH Economics Portal</h2><p>Firebase integration complete!</p></div>;
+        return <HomePage profile={profile} setRoute={setRoute} />;
       case 'profile':
         return <ProfilePage profile={profile} />;
       case 'admin':
