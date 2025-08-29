@@ -23,6 +23,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ profile }) => {
 
   const { updateProfile, updating, error } = useProfile(profile);
 
+  // Handle form input changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -49,10 +50,12 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ profile }) => {
     setIsEditing(false);
   };
 
+  // Handle clicking on profile image to trigger file selection
   const handleImageClick = () => {
     fileInputRef.current?.click();
   };
 
+  // Handle file selection and preview generation
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -70,6 +73,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ profile }) => {
     }
 
     try {
+      // Convert file to base64 for preview
       const base64 = await getFileAsBase64(file);
       setImagePreview(base64);
     } catch (error) {
@@ -78,6 +82,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ profile }) => {
     }
   };
 
+  // Save the previewed image to user profile
   const handleSaveImage = async () => {
     if (!imagePreview) return;
     
@@ -92,6 +97,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ profile }) => {
     }
   };
 
+  // Cancel image upload and clear preview
   const handleCancelImage = () => {
     setImagePreview(null);
     if (fileInputRef.current) {
@@ -106,22 +112,27 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ profile }) => {
       <div className="profile-card">
         <div className="profile-header">
           <div className="profile-picture">
+            {/* Profile picture container with click-to-upload functionality */}
             <div className="profile-picture-container" onClick={handleImageClick} title="Click to change profile picture">
               {imagePreview ? (
+                // Show preview image before saving
                 <img src={imagePreview} alt="Profile Preview" className="profile-page-avatar" />
               ) : profile.profilePicture ? (
+                // Show current profile picture
                 <img src={profile.profilePicture} alt="Profile" className="profile-page-avatar" />
               ) : (
+                // Show placeholder with user initials
                 <div className="profile-placeholder">
                   {profile.fullName.split(' ').map(n => n[0]).join('').toUpperCase()}
                 </div>
               )}
+              {/* Hover overlay to indicate clickable area */}
               <div className="profile-picture-edit-overlay">
                 <span>Change<br/>Photo</span>
               </div>
             </div>
             
-            {/* Image Preview Actions */}
+            {/* Image Preview Actions - shown when user selects a new image */}
             {imagePreview && (
               <div className="image-preview-actions">
                 <button 
@@ -141,7 +152,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ profile }) => {
               </div>
             )}
 
-            {/* Hidden file input */}
+            {/* Hidden file input for image selection */}
             <input
               ref={fileInputRef}
               type="file"

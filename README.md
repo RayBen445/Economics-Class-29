@@ -12,12 +12,14 @@ A modern, TypeScript-first community portal for LAUTECH Economics Class of '29, 
 - **Firebase Authentication** with email/password
 - **Email Verification** required for account access
 - **Password Reset** functionality
+- **Password Visibility Toggle** with eye icon for enhanced UX
 - **Role-Based Access Control** (Student, Admin, Class President)
 - **Auth State Persistence** across sessions
 
 ### User Management
 - **Firestore User Profiles** with real-time sync
 - **Profile Management** with editable user information
+- **Profile Image Upload** with live preview and validation
 - **Role-based UI** showing/hiding features based on permissions
 - **Account Status Management** (active, suspended, banned)
 
@@ -27,6 +29,8 @@ A modern, TypeScript-first community portal for LAUTECH Economics Class of '29, 
 - **Toast Notifications** for user feedback
 - **Clean, Modern Interface** with intuitive navigation
 - **Email Verification Prompts** with resend functionality
+- **Interactive Profile Image Upload** with hover effects and live preview
+- **Password Visibility Toggle** for improved accessibility and usability
 
 ## 🛠️ Tech Stack
 
