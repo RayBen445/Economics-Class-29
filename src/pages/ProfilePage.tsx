@@ -2,8 +2,7 @@ import React, { useState, useRef } from 'react';
 import { UserProfile, deleteUserAccount } from '../utils/firebase';
 import { useProfile } from '../hooks/useProfile';
 import { useNotifications } from '../hooks/useNotifications';
-import { LoadingSpinner } from '../components/LoadingSpinner';
-import ConfirmationModal from '../components/ConfirmationModal';
+import { LoadingSpinner, ConfirmationModal, ProfilePictureUpload, TwoFactorAuthSetup, SocialFeatures } from '../components';
 import { getFileAsBase64 } from '../utils/fileUtils';
 
 interface ProfilePageProps {
@@ -11,7 +10,7 @@ interface ProfilePageProps {
 }
 
 export const ProfilePage: React.FC<ProfilePageProps> = ({ profile }) => {
-  const { addNotification } = useNotifications();
+  const { addNotification, triggerSystemNotification } = useNotifications();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     firstName: profile.firstName,
@@ -24,6 +23,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ profile }) => {
   const [imageUploading, setImageUploading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showProfilePictureModal, setShowProfilePictureModal] = useState(false);
+  const [show2FAModal, setShow2FAModal] = useState(false);
+  const [showSocialModal, setShowSocialModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { updateProfile, updating, error } = useProfile(profile);
@@ -60,9 +62,32 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ profile }) => {
     setIsEditing(false);
   };
 
-  // Handle clicking on profile image to trigger file selection
+  // Handle clicking on profile image to trigger advanced upload modal
   const handleImageClick = () => {
-    fileInputRef.current?.click();
+    setShowProfilePictureModal(true);
+  };
+
+  // Handle profile picture upload completion
+  const handleProfilePictureUpload = async (url: string) => {
+    try {
+      await updateProfile({ profilePicture: url });
+      addNotification({
+        title: 'Profile Picture Updated',
+        message: 'Your profile picture has been successfully updated.',
+        type: 'success',
+        category: 'system',
+        priority: 'medium'
+      });
+    } catch (error) {
+      console.error('Error updating profile picture:', error);
+      addNotification({
+        title: 'Update Failed',
+        message: 'Failed to update profile picture. Please try again.',
+        type: 'error',
+        category: 'system',
+        priority: 'medium'
+      });
+    }
   };
 
   // Handle file selection and preview generation
@@ -325,16 +350,69 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ profile }) => {
 
         {/* Account Management Section */}
         <div className="account-management-section">
-          <h3>Account Management</h3>
+          <h3>🔧 Account Management</h3>
+          
+          {/* Security Settings */}
+          <div className="security-section">
+            <h4>🔐 Security & Privacy</h4>
+            <div className="security-options">
+              <div className="security-option">
+                <div className="option-info">
+                  <h5>Two-Factor Authentication</h5>
+                  <p>Add an extra layer of security to your account</p>
+                </div>
+                <button 
+                  className="btn btn-outline"
+                  onClick={() => setShow2FAModal(true)}
+                >
+                  🔐 Setup 2FA
+                </button>
+              </div>
+              
+              <div className="security-option">
+                <div className="option-info">
+                  <h5>Profile Picture</h5>
+                  <p>Upload and crop your profile picture</p>
+                </div>
+                <button 
+                  className="btn btn-outline"
+                  onClick={() => setShowProfilePictureModal(true)}
+                >
+                  📸 Change Picture
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Social Features */}
+          <div className="social-section">
+            <h4>👥 Social & Networking</h4>
+            <div className="social-options">
+              <div className="social-option">
+                <div className="option-info">
+                  <h5>Connect with Classmates</h5>
+                  <p>Find and connect with other Economics Class of '29 students</p>
+                </div>
+                <button 
+                  className="btn btn-primary"
+                  onClick={() => setShowSocialModal(true)}
+                >
+                  🤝 Connect & Network
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Danger Zone */}
           <div className="danger-zone">
-            <h4>Danger Zone</h4>
+            <h4>⚠️ Danger Zone</h4>
             <p>Permanently delete your account and all associated data. This action cannot be undone.</p>
             <button 
-              className="btn-danger" 
+              className="btn btn-danger" 
               onClick={() => setShowDeleteConfirm(true)}
               disabled={updating || isDeleting}
             >
-              {isDeleting ? <LoadingSpinner size="small" message="" /> : 'Delete Account'}
+              {isDeleting ? <LoadingSpinner size="small" message="" /> : '🗑️ Delete Account'}
             </button>
           </div>
         </div>
@@ -362,6 +440,25 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ profile }) => {
           <p>Are you absolutely sure you want to delete your account?</p>
         </div>
       </ConfirmationModal>
+
+      {/* Profile Picture Upload Modal */}
+      <ProfilePictureUpload
+        isOpen={showProfilePictureModal}
+        onClose={() => setShowProfilePictureModal(false)}
+        onUploadComplete={handleProfilePictureUpload}
+      />
+
+      {/* Two-Factor Authentication Setup Modal */}
+      <TwoFactorAuthSetup
+        isOpen={show2FAModal}
+        onClose={() => setShow2FAModal(false)}
+      />
+
+      {/* Social Features Modal */}
+      <SocialFeatures
+        isOpen={showSocialModal}
+        onClose={() => setShowSocialModal(false)}
+      />
     </div>
   );
 };

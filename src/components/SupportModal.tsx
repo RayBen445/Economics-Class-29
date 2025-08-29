@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFirebaseAuth } from '../hooks/useFirebaseAuth';
 import { useNotifications } from '../hooks/useNotifications';
-import { sendSupportMessage } from '../utils/supportService';
+import { sendSupportMessage, validateTelegramConfig, testTelegramBot } from '../utils/supportService';
 
 interface SupportModalProps {
   isOpen: boolean;
@@ -19,12 +19,30 @@ export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose }) =
   const { user } = useFirebaseAuth();
   const { addNotification } = useNotifications();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [telegramStatus, setTelegramStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
   const [formData, setFormData] = useState<SupportFormData>({
     category: 'general',
     subject: '',
     message: '',
     priority: 'medium'
   });
+
+  // Check Telegram connectivity on modal open
+  useEffect(() => {
+    if (isOpen) {
+      checkTelegramStatus();
+    }
+  }, [isOpen]);
+
+  const checkTelegramStatus = async () => {
+    setTelegramStatus('checking');
+    if (validateTelegramConfig()) {
+      const isConnected = await testTelegramBot();
+      setTelegramStatus(isConnected ? 'connected' : 'disconnected');
+    } else {
+      setTelegramStatus('disconnected');
+    }
+  };
 
   const categories = [
     { value: 'general', label: '🔧 General Support' },
@@ -115,7 +133,15 @@ export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose }) =
           <div className="support-intro">
             <p>Need help? We're here to assist you! Please provide details about your issue and we'll get back to you as soon as possible.</p>
             <div className="support-contact-info">
-              <p><strong>📧 Direct Email:</strong> oladoyeheritage445@gmail.com</p>
+              <p><strong>📧 Email:</strong> {import.meta.env.VITE_ADMIN_EMAIL || 'oladoyeheritage445@gmail.com'}</p>
+              <p>
+                <strong>📱 Telegram:</strong> 
+                <span className={`status-indicator ${telegramStatus}`}>
+                  {telegramStatus === 'checking' && '⏳ Checking...'}
+                  {telegramStatus === 'connected' && '✅ Connected'}
+                  {telegramStatus === 'disconnected' && '❌ Disconnected'}
+                </span>
+              </p>
               <p><strong>⏱️ Response Time:</strong> Usually within 24 hours</p>
             </div>
           </div>

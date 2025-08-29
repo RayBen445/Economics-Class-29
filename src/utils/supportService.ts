@@ -11,11 +11,9 @@ interface SupportMessage {
 
 // Email service for support messages
 export const sendSupportMessage = async (supportData: SupportMessage): Promise<void> => {
-  // For now, we'll implement email sending via EmailJS or similar service
-  // This can be extended to also send to Telegram bot when bot details are provided
-  
+  // Send to both email and Telegram as requested
   const emailData = {
-    to_email: 'oladoyeheritage445@gmail.com',
+    to_email: import.meta.env.VITE_ADMIN_EMAIL || 'oladoyeheritage445@gmail.com',
     from_name: supportData.userName,
     from_email: supportData.userEmail,
     subject: `[SUPPORT] ${supportData.category.toUpperCase()} - ${supportData.subject}`,
@@ -24,16 +22,20 @@ export const sendSupportMessage = async (supportData: SupportMessage): Promise<v
     timestamp: supportData.timestamp.toISOString()
   };
 
+  const promises: Promise<void>[] = [];
+
+  // Add email sending to promises
+  promises.push(mockEmailService(emailData));
+  
+  // Add Telegram sending to promises if configured
+  if (import.meta.env.VITE_TELEGRAM_BOT_TOKEN && import.meta.env.VITE_TELEGRAM_CHAT_ID) {
+    promises.push(sendToTelegram(supportData));
+  }
+
   try {
-    // Using a mock email service for now - in production, you'd use EmailJS, SendGrid, etc.
-    await mockEmailService(emailData);
-    
-    // If Telegram bot details are available, also send to Telegram
-    if (process.env.REACT_APP_TELEGRAM_BOT_TOKEN && process.env.REACT_APP_TELEGRAM_CHAT_ID) {
-      await sendToTelegram(supportData);
-    }
-    
-    console.log('Support message sent successfully');
+    // Send to both email and Telegram simultaneously
+    await Promise.allSettled(promises);
+    console.log('Support message sent to all configured channels');
   } catch (error) {
     console.error('Error sending support message:', error);
     throw error;
@@ -71,8 +73,8 @@ Sent from LAUTECH Economics '29 Portal
 
 // Telegram bot integration (when bot details are provided)
 const sendToTelegram = async (supportData: SupportMessage): Promise<void> => {
-  const botToken = process.env.REACT_APP_TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.REACT_APP_TELEGRAM_CHAT_ID;
+  const botToken = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
+  const chatId = import.meta.env.VITE_TELEGRAM_CHAT_ID;
   
   if (!botToken || !chatId) {
     console.warn('Telegram bot details not configured');
@@ -96,10 +98,12 @@ const sendToTelegram = async (supportData: SupportMessage): Promise<void> => {
     });
 
     if (!response.ok) {
-      throw new Error(`Telegram API error: ${response.status}`);
+      const errorData = await response.json();
+      throw new Error(`Telegram API error: ${response.status} - ${errorData.description || 'Unknown error'}`);
     }
 
-    console.log('Support message sent to Telegram successfully');
+    const result = await response.json();
+    console.log('Support message sent to Telegram successfully:', result);
   } catch (error) {
     console.error('Error sending to Telegram:', error);
     // Don't throw error here - email should still work even if Telegram fails
@@ -154,12 +158,12 @@ const mockEmailService = async (emailData: any): Promise<void> => {
 
 // Utility function to validate Telegram bot configuration
 export const validateTelegramConfig = (): boolean => {
-  return !!(process.env.REACT_APP_TELEGRAM_BOT_TOKEN && process.env.REACT_APP_TELEGRAM_CHAT_ID);
+  return !!(import.meta.env.VITE_TELEGRAM_BOT_TOKEN && import.meta.env.VITE_TELEGRAM_CHAT_ID);
 };
 
 // Test function to verify Telegram bot connectivity
 export const testTelegramBot = async (): Promise<boolean> => {
-  const botToken = process.env.REACT_APP_TELEGRAM_BOT_TOKEN;
+  const botToken = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
   
   if (!botToken) return false;
   
