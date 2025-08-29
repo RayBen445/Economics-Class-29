@@ -6,6 +6,25 @@ import { HomePage } from './pages/HomePage';
 import { EmailVerificationPrompt } from './components/EmailVerificationPrompt';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { ProfilePage } from './pages/ProfilePage';
+import { 
+  CoursePlannerPage, 
+  FacultyDirectoryPage, 
+  AssignmentsPage, 
+  ResourceLibraryPage, 
+  QuizzesPage, 
+  FlashcardsPage, 
+  GradebookPage, 
+  GpaCalculatorPage, 
+  ForumsPage, 
+  PollsSurveysPage, 
+  CalendarPage, 
+  MembersDirectoryPage, 
+  MessagesPage, 
+  TutoringMarketplacePage, 
+  JobBoardPage, 
+  StudyGroupsPage, 
+  EventsPage 
+} from './pages';
 import { signOut, setupAdminUser } from './utils/firebase';
 
 import { Route } from './types';
@@ -99,6 +118,40 @@ const App: React.FC = () => {
         return <HomePage profile={profile} setRoute={setRoute} />;
       case 'profile':
         return <ProfilePage profile={profile} />;
+      case 'coursePlanner':
+        return <CoursePlannerPage profile={profile} setRoute={setRoute} />;
+      case 'facultyDirectory':
+        return <FacultyDirectoryPage profile={profile} setRoute={setRoute} />;
+      case 'assignments':
+        return <AssignmentsPage profile={profile} setRoute={setRoute} />;
+      case 'resourceLibrary':
+        return <ResourceLibraryPage profile={profile} setRoute={setRoute} />;
+      case 'quizzes':
+        return <QuizzesPage profile={profile} setRoute={setRoute} />;
+      case 'flashcards':
+        return <FlashcardsPage profile={profile} setRoute={setRoute} />;
+      case 'gradebook':
+        return <GradebookPage profile={profile} setRoute={setRoute} />;
+      case 'gpaCalculator':
+        return <GpaCalculatorPage profile={profile} setRoute={setRoute} />;
+      case 'forums':
+        return <ForumsPage profile={profile} setRoute={setRoute} />;
+      case 'pollsSurveys':
+        return <PollsSurveysPage profile={profile} setRoute={setRoute} />;
+      case 'calendar':
+        return <CalendarPage profile={profile} setRoute={setRoute} />;
+      case 'membersDirectory':
+        return <MembersDirectoryPage profile={profile} setRoute={setRoute} />;
+      case 'messages':
+        return <MessagesPage profile={profile} setRoute={setRoute} />;
+      case 'tutoringMarketplace':
+        return <TutoringMarketplacePage profile={profile} setRoute={setRoute} />;
+      case 'jobBoard':
+        return <JobBoardPage profile={profile} setRoute={setRoute} />;
+      case 'studyGroups':
+        return <StudyGroupsPage profile={profile} setRoute={setRoute} />;
+      case 'events':
+        return <EventsPage profile={profile} setRoute={setRoute} />;
       case 'admin':
         if (profile.role !== 'Admin') {
           return <div className="error-message">Access denied: Admin access required</div>;
@@ -156,17 +209,148 @@ const App: React.FC = () => {
             >
               👤 Profile
             </button>
-            {profile.role === 'Admin' && (
+            
+            {/* Academic Features */}
+            <div className="nav-section">
+              <div className="nav-section-header">📚 Academic</div>
               <button 
-                className={route.page === 'admin' ? 'active' : ''}
-                onClick={() => setRoute({ page: 'admin' })}
+                className={route.page === 'coursePlanner' ? 'active' : ''}
+                onClick={() => setRoute({ page: 'coursePlanner' })}
               >
-                ⚙️ Admin Panel
+                📋 Course Planner
               </button>
+              <button 
+                className={route.page === 'facultyDirectory' ? 'active' : ''}
+                onClick={() => setRoute({ page: 'facultyDirectory' })}
+              >
+                👨‍🏫 Faculty Directory
+              </button>
+              <button 
+                className={route.page === 'assignments' ? 'active' : ''}
+                onClick={() => setRoute({ page: 'assignments' })}
+              >
+                📝 Assignments
+              </button>
+              <button 
+                className={route.page === 'resourceLibrary' ? 'active' : ''}
+                onClick={() => setRoute({ page: 'resourceLibrary' })}
+              >
+                📚 Resource Library
+              </button>
+            </div>
+
+            {/* Learning Tools */}
+            <div className="nav-section">
+              <div className="nav-section-header">🧠 Learning Tools</div>
+              <button 
+                className={route.page === 'quizzes' ? 'active' : ''}
+                onClick={() => setRoute({ page: 'quizzes' })}
+              >
+                🧠 Quizzes
+              </button>
+              <button 
+                className={route.page === 'flashcards' ? 'active' : ''}
+                onClick={() => setRoute({ page: 'flashcards' })}
+              >
+                🗂️ Flashcards
+              </button>
+              <button 
+                className={route.page === 'gradebook' ? 'active' : ''}
+                onClick={() => setRoute({ page: 'gradebook' })}
+              >
+                📊 Gradebook
+              </button>
+              <button 
+                className={route.page === 'gpaCalculator' ? 'active' : ''}
+                onClick={() => setRoute({ page: 'gpaCalculator' })}
+              >
+                🧮 GPA Calculator
+              </button>
+            </div>
+
+            {/* Community */}
+            <div className="nav-section">
+              <div className="nav-section-header">👥 Community</div>
+              <button 
+                className={route.page === 'forums' ? 'active' : ''}
+                onClick={() => setRoute({ page: 'forums' })}
+              >
+                💬 Forums
+              </button>
+              <button 
+                className={route.page === 'pollsSurveys' ? 'active' : ''}
+                onClick={() => setRoute({ page: 'pollsSurveys' })}
+              >
+                📊 Polls & Surveys
+              </button>
+              <button 
+                className={route.page === 'calendar' ? 'active' : ''}
+                onClick={() => setRoute({ page: 'calendar' })}
+              >
+                📅 Calendar
+              </button>
+              <button 
+                className={route.page === 'membersDirectory' ? 'active' : ''}
+                onClick={() => setRoute({ page: 'membersDirectory' })}
+              >
+                👥 Members Directory
+              </button>
+              <button 
+                className={route.page === 'messages' ? 'active' : ''}
+                onClick={() => setRoute({ page: 'messages' })}
+              >
+                💌 Messages
+              </button>
+              <button 
+                className={route.page === 'studyGroups' ? 'active' : ''}
+                onClick={() => setRoute({ page: 'studyGroups' })}
+              >
+                👨‍👩‍👧‍👦 Study Groups
+              </button>
+              <button 
+                className={route.page === 'events' ? 'active' : ''}
+                onClick={() => setRoute({ page: 'events' })}
+              >
+                🎉 Events
+              </button>
+            </div>
+
+            {/* Services */}
+            <div className="nav-section">
+              <div className="nav-section-header">💼 Services</div>
+              <button 
+                className={route.page === 'tutoringMarketplace' ? 'active' : ''}
+                onClick={() => setRoute({ page: 'tutoringMarketplace' })}
+              >
+                🎓 Tutoring Marketplace
+              </button>
+              <button 
+                className={route.page === 'jobBoard' ? 'active' : ''}
+                onClick={() => setRoute({ page: 'jobBoard' })}
+              >
+                💼 Job Board
+              </button>
+            </div>
+
+            {/* Admin Section */}
+            {profile.role === 'Admin' && (
+              <div className="nav-section">
+                <div className="nav-section-header">⚙️ Admin</div>
+                <button 
+                  className={route.page === 'admin' ? 'active' : ''}
+                  onClick={() => setRoute({ page: 'admin' })}
+                >
+                  ⚙️ Admin Panel
+                </button>
+              </div>
             )}
-            <button onClick={handleSignOut}>
-              🚪 Sign Out
-            </button>
+
+            {/* Sign Out */}
+            <div className="nav-section">
+              <button onClick={handleSignOut} className="sign-out-btn">
+                🚪 Sign Out
+              </button>
+            </div>
           </nav>
         </div>
       </div>
