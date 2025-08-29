@@ -242,3 +242,67 @@ export const setupAdminUser = async (): Promise<void> => {
 export const onAuthStateChange = (callback: (user: User | null) => void) => {
   return onAuthStateChanged(auth, callback);
 };
+
+// Generic Firestore operations
+export const addDocument = async (collectionName: string, data: any) => {
+  try {
+    const docRef = await addDoc(collection(db, collectionName), {
+      ...data,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    });
+    return docRef.id;
+  } catch (error: any) {
+    console.error(`Error adding document to ${collectionName}:`, error);
+    toast.error('Failed to save data');
+    throw error;
+  }
+};
+
+export const getCollection = async (collectionName: string, orderByField?: string, limitCount?: number) => {
+  try {
+    let q = collection(db, collectionName);
+    
+    if (orderByField) {
+      q = query(q as any, orderBy(orderByField, 'desc'));
+    }
+    
+    if (limitCount) {
+      q = query(q as any, limit(limitCount));
+    }
+    
+    const querySnapshot = await getDocs(q as any);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  } catch (error: any) {
+    console.error(`Error getting ${collectionName}:`, error);
+    throw error;
+  }
+};
+
+export const updateDocument = async (collectionName: string, docId: string, updates: any) => {
+  try {
+    const docRef = doc(db, collectionName, docId);
+    await updateDoc(docRef, {
+      ...updates,
+      updatedAt: Timestamp.now()
+    });
+    toast.success('Updated successfully!');
+  } catch (error: any) {
+    console.error(`Error updating document in ${collectionName}:`, error);
+    toast.error('Failed to update');
+    throw error;
+  }
+};
+
+export const getAllUsers = async (): Promise<UserProfile[]> => {
+  try {
+    const querySnapshot = await getDocs(collection(db, 'users'));
+    return querySnapshot.docs.map(doc => doc.data() as UserProfile);
+  } catch (error) {
+    console.error('Error getting all users:', error);
+    return [];
+  }
+};
