@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { UserProfile } from '../utils/firebase';
 import { useProfile } from '../hooks/useProfile';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { getFileAsBase64 } from '../utils/fileUtils';
 
 interface ProfilePageProps {
   profile: UserProfile;
@@ -16,9 +17,13 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ profile }) => {
     username: profile.username,
     matricNumber: profile.matricNumber
   });
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageUploading, setImageUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { updateProfile, updating, error } = useProfile(profile);
 
+  // Handle form input changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -45,6 +50,61 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ profile }) => {
     setIsEditing(false);
   };
 
+  // Handle clicking on profile image to trigger file selection
+  const handleImageClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  // Handle file selection and preview generation
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image size must be less than 5MB');
+      return;
+    }
+
+    try {
+      // Convert file to base64 for preview
+      const base64 = await getFileAsBase64(file);
+      setImagePreview(base64);
+    } catch (error) {
+      console.error('Error reading image:', error);
+      alert('Error reading image. Please try again.');
+    }
+  };
+
+  // Save the previewed image to user profile
+  const handleSaveImage = async () => {
+    if (!imagePreview) return;
+    
+    setImageUploading(true);
+    try {
+      await updateProfile({ profilePicture: imagePreview });
+      setImagePreview(null);
+    } catch (error) {
+      console.error('Error uploading image:', error);
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
+  // Cancel image upload and clear preview
+  const handleCancelImage = () => {
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   return (
     <div className="profile-page">
       <h2>Profile</h2>
@@ -52,13 +112,54 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ profile }) => {
       <div className="profile-card">
         <div className="profile-header">
           <div className="profile-picture">
-            {profile.profilePicture ? (
-              <img src={profile.profilePicture} alt="Profile" />
-            ) : (
-              <div className="profile-placeholder">
-                {profile.fullName.split(' ').map(n => n[0]).join('').toUpperCase()}
+            {/* Profile picture container with click-to-upload functionality */}
+            <div className="profile-picture-container" onClick={handleImageClick} title="Click to change profile picture">
+              {imagePreview ? (
+                // Show preview image before saving
+                <img src={imagePreview} alt="Profile Preview" className="profile-page-avatar" />
+              ) : profile.profilePicture ? (
+                // Show current profile picture
+                <img src={profile.profilePicture} alt="Profile" className="profile-page-avatar" />
+              ) : (
+                // Show placeholder with user initials
+                <div className="profile-placeholder">
+                  {profile.fullName.split(' ').map(n => n[0]).join('').toUpperCase()}
+                </div>
+              )}
+              {/* Hover overlay to indicate clickable area */}
+              <div className="profile-picture-edit-overlay">
+                <span>Change<br/>Photo</span>
+              </div>
+            </div>
+            
+            {/* Image Preview Actions - shown when user selects a new image */}
+            {imagePreview && (
+              <div className="image-preview-actions">
+                <button 
+                  className="btn-primary btn-sm" 
+                  onClick={handleSaveImage}
+                  disabled={imageUploading}
+                >
+                  {imageUploading ? <LoadingSpinner size="small" message="" /> : 'Save Photo'}
+                </button>
+                <button 
+                  className="btn-secondary btn-sm" 
+                  onClick={handleCancelImage}
+                  disabled={imageUploading}
+                >
+                  Cancel
+                </button>
               </div>
             )}
+
+            {/* Hidden file input for image selection */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageChange}
+              style={{ display: 'none' }}
+            />
           </div>
           <div className="profile-info">
             <h3>{profile.fullName}</h3>

@@ -6,7 +6,7 @@ import { HomePage } from './pages/HomePage';
 import { EmailVerificationPrompt } from './components/EmailVerificationPrompt';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { ProfilePage } from './pages/ProfilePage';
-import { signOut } from './utils/firebase';
+import { signOut, setupAdminUser } from './utils/firebase';
 
 import { Route } from './types';
 
@@ -14,6 +14,20 @@ const App: React.FC = () => {
   const { user, profile, loading, error } = useFirebaseAuth();
   const [route, setRoute] = React.useState<Route>({ page: 'home' });
   const [isSidebarOpen, setSidebarOpen] = React.useState(false);
+
+  // Setup admin user on first load
+  React.useEffect(() => {
+    const hasSetupAdmin = localStorage.getItem('adminSetupComplete');
+    if (!hasSetupAdmin) {
+      // Run admin setup in the background
+      setupAdminUser().finally(() => {
+        localStorage.setItem('adminSetupComplete', 'true');
+      });
+    }
+
+    // Expose admin setup function globally for manual use
+    (window as any).setupAdmin = setupAdminUser;
+  }, []);
 
   // Show loading spinner while checking authentication
   if (loading) {
@@ -89,7 +103,31 @@ const App: React.FC = () => {
         if (profile.role !== 'Admin') {
           return <div className="error-message">Access denied: Admin access required</div>;
         }
-        return <div className="page"><h2>Admin Panel</h2><p>Admin functionality coming soon...</p></div>;
+        return (
+          <div className="page">
+            <h2>Admin Panel</h2>
+            <div className="admin-section">
+              <h3>User Management</h3>
+              <div className="admin-actions">
+                <button 
+                  className="btn-primary"
+                  onClick={setupAdminUser}
+                  title="Promote oladoyeheritage445@gmail.com to Admin"
+                >
+                  Setup Admin User (Heritage)
+                </button>
+              </div>
+              <p className="admin-note">
+                Click the button above to promote oladoyeheritage445@gmail.com to Admin role.
+                This can also be done from the browser console by calling: <code>setupAdmin()</code>
+              </p>
+            </div>
+            <div className="admin-section">
+              <h3>System Status</h3>
+              <p>All systems operational. Additional admin functionality coming soon...</p>
+            </div>
+          </div>
+        );
       default:
         return <div className="page"><h2>Page Not Found</h2></div>;
     }

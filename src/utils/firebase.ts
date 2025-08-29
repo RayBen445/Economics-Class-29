@@ -195,6 +195,49 @@ export const checkAdminRole = async (uid: string): Promise<boolean> => {
   }
 };
 
+// Promote user to admin by email
+export const promoteUserToAdmin = async (email: string): Promise<boolean> => {
+  try {
+    // Query for user by email
+    const q = query(
+      collection(db, 'users'), 
+      where('email', '==', email),
+      limit(1)
+    );
+    const querySnapshot = await getDocs(q);
+    
+    if (querySnapshot.empty) {
+      console.error('User not found with email:', email);
+      toast.error('User not found with that email address');
+      return false;
+    }
+    
+    const userDoc = querySnapshot.docs[0];
+    const userId = userDoc.id;
+    
+    // Update user role to Admin
+    await updateDoc(doc(db, 'users', userId), {
+      role: 'Admin',
+      updatedAt: Timestamp.now()
+    });
+    
+    console.log(`Successfully promoted ${email} to Admin`);
+    toast.success(`Successfully promoted ${email} to Admin`);
+    return true;
+  } catch (error: any) {
+    console.error('Error promoting user to admin:', error);
+    toast.error('Failed to promote user to admin');
+    return false;
+  }
+};
+
+// Admin setup utility - promotes specific email to admin
+export const setupAdminUser = async (): Promise<void> => {
+  const adminEmail = 'oladoyeheritage445@gmail.com';
+  console.log(`Setting up admin privileges for ${adminEmail}...`);
+  await promoteUserToAdmin(adminEmail);
+};
+
 // Auth state observer
 export const onAuthStateChange = (callback: (user: User | null) => void) => {
   return onAuthStateChanged(auth, callback);
