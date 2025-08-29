@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { UserProfile, deleteUserAccount } from '../utils/firebase';
 import { useProfile } from '../hooks/useProfile';
+import { useNotifications } from '../hooks/useNotifications';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { getFileAsBase64 } from '../utils/fileUtils';
@@ -10,6 +11,7 @@ interface ProfilePageProps {
 }
 
 export const ProfilePage: React.FC<ProfilePageProps> = ({ profile }) => {
+  const { addNotification } = useNotifications();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     firstName: profile.firstName,
@@ -39,6 +41,11 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ profile }) => {
     await updateProfile(formData);
     if (!error) {
       setIsEditing(false);
+      addNotification({
+        title: 'Profile Updated',
+        message: 'Your profile information has been successfully updated.',
+        type: 'success'
+      });
     }
   };
 
@@ -93,8 +100,18 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ profile }) => {
     try {
       await updateProfile({ profilePicture: imagePreview });
       setImagePreview(null);
+      addNotification({
+        title: 'Profile Picture Updated',
+        message: 'Your profile picture has been successfully updated.',
+        type: 'success'
+      });
     } catch (error) {
       console.error('Error uploading image:', error);
+      addNotification({
+        title: 'Upload Failed',
+        message: 'Failed to update profile picture. Please try again.',
+        type: 'error'
+      });
     } finally {
       setImageUploading(false);
     }

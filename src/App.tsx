@@ -1,10 +1,14 @@
 import React from 'react';
 import { Toaster } from 'react-hot-toast';
 import { useFirebaseAuth } from './hooks/useFirebaseAuth';
+import { ThemeProvider } from './hooks/useTheme';
+import { NotificationProvider, useNotifications } from './hooks/useNotifications';
 import { AuthPage } from './pages/AuthPage';
 import { HomePage } from './pages/HomePage';
 import { EmailVerificationPrompt } from './components/EmailVerificationPrompt';
 import { LoadingSpinner } from './components/LoadingSpinner';
+import { DarkModeToggle } from './components/DarkModeToggle';
+import { NotificationBell } from './components/NotificationBell';
 import { ProfilePage } from './pages/ProfilePage';
 import { 
   CoursePlannerPage, 
@@ -30,7 +34,18 @@ import { signOut, setupAdminUser } from './utils/firebase';
 import { Route } from './types';
 
 const App: React.FC = () => {
+  return (
+    <ThemeProvider>
+      <NotificationProvider>
+        <AppContent />
+      </NotificationProvider>
+    </ThemeProvider>
+  );
+};
+
+const AppContent: React.FC = () => {
   const { user, profile, loading, error } = useFirebaseAuth();
+  const { addNotification } = useNotifications();
   const [route, setRoute] = React.useState<Route>({ page: 'home' });
   const [isSidebarOpen, setSidebarOpen] = React.useState(false);
 
@@ -47,6 +62,36 @@ const App: React.FC = () => {
     // Expose admin setup function globally for manual use
     (window as any).setupAdmin = setupAdminUser;
   }, []);
+
+  // Add sample notifications on first load for demonstration
+  React.useEffect(() => {
+    if (profile) {
+      const hasAddedSampleNotifications = localStorage.getItem('sampleNotificationsAdded');
+      if (!hasAddedSampleNotifications) {
+        setTimeout(() => {
+          addNotification({
+            title: 'Welcome to LAUTECH Economics Portal!',
+            message: 'Explore all the new features including account management, dark mode, and more.',
+            type: 'success'
+          });
+          
+          addNotification({
+            title: 'New Feature: Account Deletion',
+            message: 'You can now delete your account from the Profile page. This action is permanent.',
+            type: 'info'
+          });
+
+          addNotification({
+            title: 'Dark Mode Available',
+            message: 'Toggle between light and dark themes using the button in the header.',
+            type: 'info'
+          });
+        }, 2000);
+        
+        localStorage.setItem('sampleNotificationsAdded', 'true');
+      }
+    }
+  }, [profile, addNotification]);
 
   // Show loading spinner while checking authentication
   if (loading) {
@@ -371,9 +416,13 @@ const App: React.FC = () => {
             <h1>LAUTECH Economics Portal</h1>
           </div>
           <div className="header-content">
-            <div className="user-info">
-              <span>Welcome, {profile.fullName}</span>
-              <span className="user-role">({profile.role})</span>
+            <div className="header-controls">
+              <NotificationBell />
+              <DarkModeToggle />
+              <div className="user-info">
+                <span>Welcome, {profile.fullName}</span>
+                <span className="user-role">({profile.role})</span>
+              </div>
             </div>
           </div>
         </header>
