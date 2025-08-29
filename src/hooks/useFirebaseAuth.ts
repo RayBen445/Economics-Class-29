@@ -18,6 +18,43 @@ export const useFirebaseAuth = () => {
   });
 
   useEffect(() => {
+    // Check for demo mode
+    const isDemoMode = window.location.search.includes('demo=true') || localStorage.getItem('demoMode') === 'true';
+    
+    if (isDemoMode) {
+      // Simulate a demo user for testing UI
+      const demoUser = {
+        uid: 'demo-user-123',
+        email: 'demo@lautech-econ29.com',
+        emailVerified: true
+      } as User;
+      
+      const demoProfile: UserProfile = {
+        uid: 'demo-user-123',
+        email: 'demo@lautech-econ29.com',
+        firstName: 'Demo',
+        lastName: 'Student',
+        fullName: 'Demo Student',
+        username: 'demostudent',
+        matricNumber: '2024000001',
+        role: 'Student',
+        status: 'active',
+        createdAt: { toDate: () => new Date() } as any
+      };
+      
+      setTimeout(() => {
+        setAuthState({
+          user: demoUser,
+          profile: demoProfile,
+          loading: false,
+          error: null
+        });
+      }, 1000);
+      
+      return () => {}; // No cleanup needed for demo mode
+    }
+    
+    // Normal Firebase authentication
     const unsubscribe = onAuthStateChange(async (user) => {
       if (user) {
         try {
