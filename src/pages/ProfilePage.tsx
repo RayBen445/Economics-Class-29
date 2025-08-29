@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
-import { UserProfile } from '../utils/firebase';
+import { UserProfile, deleteUserAccount } from '../utils/firebase';
 import { useProfile } from '../hooks/useProfile';
-import { LoadingSpinner } from '../components/LoadingSpinner';
+import { useNotifications } from '../hooks/useNotifications';
+import { LoadingSpinner, ConfirmationModal, ProfilePictureUpload, TwoFactorAuthSetup, SocialFeatures } from '../components';
 import { getFileAsBase64 } from '../utils/fileUtils';
 
 interface ProfilePageProps {
@@ -9,6 +10,7 @@ interface ProfilePageProps {
 }
 
 export const ProfilePage: React.FC<ProfilePageProps> = ({ profile }) => {
+  const { addNotification, triggerSystemNotification } = useNotifications();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     firstName: profile.firstName,
@@ -19,6 +21,11 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ profile }) => {
   });
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showProfilePictureModal, setShowProfilePictureModal] = useState(false);
+  const [show2FAModal, setShow2FAModal] = useState(false);
+  const [showSocialModal, setShowSocialModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { updateProfile, updating, error } = useProfile(profile);
@@ -36,6 +43,11 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ profile }) => {
     await updateProfile(formData);
     if (!error) {
       setIsEditing(false);
+      addNotification({
+        title: 'Profile Updated',
+        message: 'Your profile information has been successfully updated.',
+        type: 'success'
+      });
     }
   };
 
@@ -50,9 +62,32 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ profile }) => {
     setIsEditing(false);
   };
 
-  // Handle clicking on profile image to trigger file selection
+  // Handle clicking on profile image to trigger advanced upload modal
   const handleImageClick = () => {
-    fileInputRef.current?.click();
+    setShowProfilePictureModal(true);
+  };
+
+  // Handle profile picture upload completion
+  const handleProfilePictureUpload = async (url: string) => {
+    try {
+      await updateProfile({ profilePicture: url });
+      addNotification({
+        title: 'Profile Picture Updated',
+        message: 'Your profile picture has been successfully updated.',
+        type: 'success',
+        category: 'system',
+        priority: 'medium'
+      });
+    } catch (error) {
+      console.error('Error updating profile picture:', error);
+      addNotification({
+        title: 'Update Failed',
+        message: 'Failed to update profile picture. Please try again.',
+        type: 'error',
+        category: 'system',
+        priority: 'medium'
+      });
+    }
   };
 
   // Handle file selection and preview generation
@@ -90,8 +125,18 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ profile }) => {
     try {
       await updateProfile({ profilePicture: imagePreview });
       setImagePreview(null);
+      addNotification({
+        title: 'Profile Picture Updated',
+        message: 'Your profile picture has been successfully updated.',
+        type: 'success'
+      });
     } catch (error) {
       console.error('Error uploading image:', error);
+      addNotification({
+        title: 'Upload Failed',
+        message: 'Failed to update profile picture. Please try again.',
+        type: 'error'
+      });
     } finally {
       setImageUploading(false);
     }
@@ -102,6 +147,23 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ profile }) => {
     setImagePreview(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+  };
+
+  // Handle account deletion
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true);
+    try {
+      const success = await deleteUserAccount(profile.uid);
+      if (success) {
+        // Account deleted successfully, user will be automatically signed out
+        // No need to do anything else here as the app will redirect to auth page
+      }
+    } catch (error) {
+      console.error('Error deleting account:', error);
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -285,7 +347,118 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ profile }) => {
             </>
           )}
         </div>
+
+        {/* Account Management Section */}
+        <div className="account-management-section">
+          <h3>🔧 Account Management</h3>
+          
+          {/* Security Settings */}
+          <div className="security-section">
+            <h4>🔐 Security & Privacy</h4>
+            <div className="security-options">
+              <div className="security-option">
+                <div className="option-info">
+                  <h5>Two-Factor Authentication</h5>
+                  <p>Add an extra layer of security to your account</p>
+                </div>
+                <button 
+                  className="btn btn-outline"
+                  onClick={() => setShow2FAModal(true)}
+                >
+                  🔐 Setup 2FA
+                </button>
+              </div>
+              
+              <div className="security-option">
+                <div className="option-info">
+                  <h5>Profile Picture</h5>
+                  <p>Upload and crop your profile picture</p>
+                </div>
+                <button 
+                  className="btn btn-outline"
+                  onClick={() => setShowProfilePictureModal(true)}
+                >
+                  📸 Change Picture
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Social Features */}
+          <div className="social-section">
+            <h4>👥 Social & Networking</h4>
+            <div className="social-options">
+              <div className="social-option">
+                <div className="option-info">
+                  <h5>Connect with Classmates</h5>
+                  <p>Find and connect with other Economics Class of '29 students</p>
+                </div>
+                <button 
+                  className="btn btn-primary"
+                  onClick={() => setShowSocialModal(true)}
+                >
+                  🤝 Connect & Network
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Danger Zone */}
+          <div className="danger-zone">
+            <h4>⚠️ Danger Zone</h4>
+            <p>Permanently delete your account and all associated data. This action cannot be undone.</p>
+            <button 
+              className="btn btn-danger" 
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={updating || isDeleting}
+            >
+              {isDeleting ? <LoadingSpinner size="small" message="" /> : '🗑️ Delete Account'}
+            </button>
+          </div>
+        </div>
       </div>
+
+      {/* Confirmation Modal for Account Deletion */}
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDeleteAccount}
+        title="Delete Account"
+        confirmText="Delete Account"
+        cancelText="Cancel"
+        dangerConfirm={true}
+      >
+        <div className="delete-account-warning">
+          <p><strong>Warning:</strong> This action is permanent and cannot be undone.</p>
+          <p>Deleting your account will:</p>
+          <ul>
+            <li>Permanently remove your profile and personal information</li>
+            <li>Delete all your messages, posts, and contributions</li>
+            <li>Remove you from all study groups and conversations</li>
+            <li>Cancel any active tutoring sessions or job applications</li>
+          </ul>
+          <p>Are you absolutely sure you want to delete your account?</p>
+        </div>
+      </ConfirmationModal>
+
+      {/* Profile Picture Upload Modal */}
+      <ProfilePictureUpload
+        isOpen={showProfilePictureModal}
+        onClose={() => setShowProfilePictureModal(false)}
+        onUploadComplete={handleProfilePictureUpload}
+      />
+
+      {/* Two-Factor Authentication Setup Modal */}
+      <TwoFactorAuthSetup
+        isOpen={show2FAModal}
+        onClose={() => setShow2FAModal(false)}
+      />
+
+      {/* Social Features Modal */}
+      <SocialFeatures
+        isOpen={showSocialModal}
+        onClose={() => setShowSocialModal(false)}
+      />
     </div>
   );
 };

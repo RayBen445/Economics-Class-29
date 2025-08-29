@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { SignInForm } from '../components/SignInForm';
 import { SignUpForm } from '../components/SignUpForm';
 import { ForgotPasswordForm } from '../components/ForgotPasswordForm';
+import { Footer } from '../components/Footer';
 
 type AuthView = 'signin' | 'signup' | 'forgot';
 
@@ -32,6 +33,7 @@ export const AuthPage: React.FC = () => {
           {renderAuthForm()}
         </div>
       </div>
+      <Footer />
     </div>
   );
 };

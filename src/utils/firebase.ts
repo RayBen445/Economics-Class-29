@@ -8,6 +8,7 @@ import {
   sendPasswordResetEmail,
   updateProfile,
   onAuthStateChanged,
+  deleteUser,
   User
 } from 'firebase/auth';
 import { 
@@ -16,6 +17,7 @@ import {
   getDoc, 
   setDoc, 
   updateDoc, 
+  deleteDoc,
   collection,
   addDoc,
   query,
@@ -241,4 +243,102 @@ export const setupAdminUser = async (): Promise<void> => {
 // Auth state observer
 export const onAuthStateChange = (callback: (user: User | null) => void) => {
   return onAuthStateChanged(auth, callback);
+};
+
+// Generic Firestore operations
+export const addDocument = async (collectionName: string, data: any) => {
+  try {
+    const docRef = await addDoc(collection(db, collectionName), {
+      ...data,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    });
+    return docRef.id;
+  } catch (error: any) {
+    console.error(`Error adding document to ${collectionName}:`, error);
+    toast.error('Failed to save data');
+    throw error;
+  }
+};
+
+export const getCollection = async (collectionName: string, orderByField?: string, limitCount?: number) => {
+  try {
+    let q = collection(db, collectionName);
+    
+    if (orderByField) {
+      q = query(q as any, orderBy(orderByField, 'desc'));
+    }
+    
+    if (limitCount) {
+      q = query(q as any, limit(limitCount));
+    }
+    
+    const querySnapshot = await getDocs(q as any);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  } catch (error: any) {
+    console.error(`Error getting ${collectionName}:`, error);
+    throw error;
+  }
+};
+
+export const updateDocument = async (collectionName: string, docId: string, updates: any) => {
+  try {
+    const docRef = doc(db, collectionName, docId);
+    await updateDoc(docRef, {
+      ...updates,
+      updatedAt: Timestamp.now()
+    });
+    toast.success('Updated successfully!');
+  } catch (error: any) {
+    console.error(`Error updating document in ${collectionName}:`, error);
+    toast.error('Failed to update');
+    throw error;
+  }
+};
+
+export const getAllUsers = async (): Promise<UserProfile[]> => {
+  try {
+    const querySnapshot = await getDocs(collection(db, 'users'));
+    return querySnapshot.docs.map(doc => doc.data() as UserProfile);
+  } catch (error) {
+    console.error('Error getting all users:', error);
+    return [];
+  }
+};
+
+// Account deletion function
+export const deleteUserAccount = async (userId: string): Promise<boolean> => {
+  try {
+    const user = auth.currentUser;
+    if (!user || user.uid !== userId) {
+      toast.error('Authentication required to delete account');
+      return false;
+    }
+
+    // Delete user profile document from Firestore
+    await deleteDoc(doc(db, 'users', userId));
+    
+    // Delete related data (optional - could be kept for data integrity)
+    // Note: In a real application, you might want to keep some data for audit purposes
+    // or allow users to download their data before deletion
+    
+    // Delete the Firebase Authentication user
+    await deleteUser(user);
+    
+    toast.success('Account deleted successfully');
+    return true;
+  } catch (error: any) {
+    console.error('Error deleting user account:', error);
+    
+    // Handle specific error cases
+    if (error.code === 'auth/requires-recent-login') {
+      toast.error('Please sign in again before deleting your account for security purposes');
+    } else {
+      toast.error('Failed to delete account. Please try again.');
+    }
+    return false;
+  }
 };
