@@ -360,14 +360,17 @@ const App: React.FC = () => {
       {/* Simplified Header */}
       <div className="main-content-wrapper">
         <header className="header">
-          <button 
-            className="sidebar-toggle" 
-            onClick={() => setSidebarOpen(!isSidebarOpen)}
-          >
-            ☰
-          </button>
-          <div className="header-content">
+          <div className="header-left">
+            <button 
+              className="sidebar-toggle" 
+              onClick={() => setSidebarOpen(!isSidebarOpen)}
+              title="Toggle Navigation"
+            >
+              ☰
+            </button>
             <h1>LAUTECH Economics Portal</h1>
+          </div>
+          <div className="header-content">
             <div className="user-info">
               <span>Welcome, {profile.fullName}</span>
               <span className="user-role">({profile.role})</span>

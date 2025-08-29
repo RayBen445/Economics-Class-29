@@ -8,6 +8,7 @@ import {
   sendPasswordResetEmail,
   updateProfile,
   onAuthStateChanged,
+  deleteUser,
   User
 } from 'firebase/auth';
 import { 
@@ -16,6 +17,7 @@ import {
   getDoc, 
   setDoc, 
   updateDoc, 
+  deleteDoc,
   collection,
   addDoc,
   query,
@@ -304,5 +306,39 @@ export const getAllUsers = async (): Promise<UserProfile[]> => {
   } catch (error) {
     console.error('Error getting all users:', error);
     return [];
+  }
+};
+
+// Account deletion function
+export const deleteUserAccount = async (userId: string): Promise<boolean> => {
+  try {
+    const user = auth.currentUser;
+    if (!user || user.uid !== userId) {
+      toast.error('Authentication required to delete account');
+      return false;
+    }
+
+    // Delete user profile document from Firestore
+    await deleteDoc(doc(db, 'users', userId));
+    
+    // Delete related data (optional - could be kept for data integrity)
+    // Note: In a real application, you might want to keep some data for audit purposes
+    // or allow users to download their data before deletion
+    
+    // Delete the Firebase Authentication user
+    await deleteUser(user);
+    
+    toast.success('Account deleted successfully');
+    return true;
+  } catch (error: any) {
+    console.error('Error deleting user account:', error);
+    
+    // Handle specific error cases
+    if (error.code === 'auth/requires-recent-login') {
+      toast.error('Please sign in again before deleting your account for security purposes');
+    } else {
+      toast.error('Failed to delete account. Please try again.');
+    }
+    return false;
   }
 };
