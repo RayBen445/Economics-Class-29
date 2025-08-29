@@ -9,6 +9,7 @@ import { EmailVerificationPrompt } from './components/EmailVerificationPrompt';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { DarkModeToggle } from './components/DarkModeToggle';
 import { NotificationBell } from './components/NotificationBell';
+import { Footer } from './components/Footer';
 import { ProfilePage } from './pages/ProfilePage';
 import { 
   CoursePlannerPage, 
@@ -430,6 +431,8 @@ const AppContent: React.FC = () => {
         <main className="main">
           {renderPage()}
         </main>
+        
+        <Footer />
       </div>
     </div>
   );
