@@ -277,6 +277,52 @@ hr {
 .auth-switch a {
     font-weight: 700;
 }
+
+/* Password Toggle Styles */
+.password-input-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.password-input-container input {
+    width: 100%;
+    padding-right: 3rem; /* Make room for toggle button */
+}
+
+.password-toggle-btn {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.25rem;
+    color: var(--text-color);
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+}
+
+.password-toggle-btn:hover:not(:disabled) {
+    opacity: 1;
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.password-toggle-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.password-toggle-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
 .error-message {
     background-color: #f8d7da;
     color: #721c24;
@@ -783,6 +829,33 @@ input[type="file"] {
 }
 .profile-picture-container:hover .profile-picture-edit-overlay {
     opacity: 1;
+}
+
+.profile-placeholder {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 4px solid var(--accent-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--accent-color);
+    background-color: var(--background-color);
+}
+
+/* Image Preview Actions */
+.image-preview-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    margin-top: 1rem;
+}
+
+.btn-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
 }
 
 /* Lost & Found Page */
