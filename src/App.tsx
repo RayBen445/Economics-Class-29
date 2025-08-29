@@ -9,6 +9,7 @@ import { EmailVerificationPrompt } from './components/EmailVerificationPrompt';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { DarkModeToggle } from './components/DarkModeToggle';
 import { NotificationBell } from './components/NotificationBell';
+import { SupportButton } from './components/SupportButton';
 import { Footer } from './components/Footer';
 import { ProfilePage } from './pages/ProfilePage';
 import { 
@@ -31,6 +32,7 @@ import {
   EventsPage 
 } from './pages';
 import { signOut, setupAdminUser } from './utils/firebase';
+import { notificationService } from './utils/notificationService';
 
 import { Route } from './types';
 
@@ -67,6 +69,9 @@ const AppContent: React.FC = () => {
   // Add sample notifications on first load for demonstration
   React.useEffect(() => {
     if (profile) {
+      // Initialize notification service
+      notificationService.initialize(addNotification, profile);
+      
       const hasAddedSampleNotifications = localStorage.getItem('sampleNotificationsAdded');
       if (!hasAddedSampleNotifications) {
         setTimeout(() => {
@@ -77,14 +82,14 @@ const AppContent: React.FC = () => {
           });
           
           addNotification({
-            title: 'New Feature: Account Deletion',
-            message: 'You can now delete your account from the Profile page. This action is permanent.',
+            title: 'New Feature: Support System',
+            message: 'Need help? Click the Support button in the header to get assistance.',
             type: 'info'
           });
 
           addNotification({
-            title: 'Dark Mode Available',
-            message: 'Toggle between light and dark themes using the button in the header.',
+            title: 'Enhanced Reactions Available',
+            message: 'React to posts with 20+ emoji options including 👍, ❤️, 😂, 🔥, and more!',
             type: 'info'
           });
         }, 2000);
@@ -418,6 +423,7 @@ const AppContent: React.FC = () => {
           </div>
           <div className="header-content">
             <div className="header-controls">
+              <SupportButton />
               <NotificationBell />
               <DarkModeToggle />
               <div className="user-info">

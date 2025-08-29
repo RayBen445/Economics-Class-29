@@ -28,6 +28,16 @@ export const NotificationBell: React.FC = () => {
       case 'success': return '✅';
       case 'warning': return '⚠️';
       case 'error': return '❌';
+      case 'message': return '💌';
+      case 'reaction': return '😊';
+      case 'forum': return '📝';
+      case 'assignment': return '📋';
+      case 'event': return '🎉';
+      case 'study_group': return '👥';
+      case 'poll': return '📊';
+      case 'quiz': return '🧠';
+      case 'mention': return '🏷️';
+      case 'system': return '⚙️';
       default: return 'ℹ️';
     }
   };
